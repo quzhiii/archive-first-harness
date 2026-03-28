@@ -2,9 +2,14 @@
 
 from typing import Any
 
+from harness.evaluation.evaluation_input import to_realm_evaluator_payload
+
 
 class RealmEvaluator:
     """Convert a minimal metrics summary into a conservative recommendation."""
+
+    def evaluate_bundle(self, bundle: object) -> dict[str, Any]:
+        return self.evaluate(to_realm_evaluator_payload(bundle))
 
     def evaluate(self, metrics_summary: dict[str, Any]) -> dict[str, Any]:
         recommendation, reason_codes = self.build_recommendation(metrics_summary)
@@ -102,3 +107,4 @@ class RealmEvaluator:
 
     def _has_metric(self, metrics_summary: dict[str, Any], metric_name: str) -> bool:
         return metric_name in metrics_summary.get("metrics", {})
+

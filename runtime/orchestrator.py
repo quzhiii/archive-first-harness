@@ -1,9 +1,13 @@
 ﻿from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, is_dataclass, replace
 from enum import Enum
 from typing import Any
 
+from harness.evaluation.baseline_compare import BaselineComparator
+from harness.evaluation.evaluation_input import build_evaluation_input_bundle
+from harness.evaluation.realm_evaluator import RealmEvaluator
 from harness.hooks.hook_orchestrator import HookOrchestrator
 from harness.hooks.models import (
     GovernanceCheckPayload,
@@ -15,6 +19,7 @@ from harness.hooks.models import (
 from harness.sandbox.rollback import RollbackManager
 from harness.sandbox.sandbox_executor import SandboxExecutor
 from harness.state.models import RiskLevel, TaskBlock
+from harness.telemetry.metrics import MetricsAggregator
 
 
 class Orchestrator:
@@ -36,8 +41,12 @@ class Orchestrator:
         hook_orchestrator: HookOrchestrator | None = None,
         sandbox_executor: SandboxExecutor | None = None,
         rollback_manager: RollbackManager | None = None,
+        baseline_artifacts: Mapping[str, Mapping[str, Any] | Sequence[Any]] | None = None,
+        baseline_comparator: BaselineComparator | None = None,
+        realm_evaluator: RealmEvaluator | None = None,
     ) -> dict[str, Any]:
         active_hooks = hook_orchestrator or HookOrchestrator()
+        dispatch_start_index = len(active_hooks.get_recent_dispatches())
         active_rollback = (
             rollback_manager
             or getattr(sandbox_executor, "rollback_manager", None)
@@ -51,6 +60,12 @@ class Orchestrator:
         raw_snapshot = state_manager.build_state_snapshot_for_context(task_id)
         state_snapshot = self._prepare_snapshot(task_contract, raw_snapshot)
         journal_lessons = self._read_relevant_journal_lessons(learning_journal, task_contract)
+        block_selection_report = self._build_block_selection_report(
+            context_engine=context_engine,
+            task_contract=task_contract,
+            state_snapshot=state_snapshot,
+            journal_lessons=journal_lessons,
+        )
         working_context = context_engine.build_working_context(
             task_contract,
             state_snapshot,
@@ -173,7 +188,7 @@ class Orchestrator:
                 expected_version=raw_snapshot.versions["task_block"],
             )
 
-        result["learning_journal"] = self._append_learning_lesson(
+        learning_journal_result, journal_append_artifact = self._append_learning_lesson(
             hook_orchestrator=active_hooks,
             learning_journal=learning_journal,
             task_contract=task_contract,
@@ -184,6 +199,47 @@ class Orchestrator:
             rollback_result=result["rollback_result"],
             read_count=len(journal_lessons),
         )
+        result["learning_journal"] = learning_journal_result
+
+        dispatch_trace = self._capture_run_dispatch_trace(
+            active_hooks,
+            start_index=dispatch_start_index,
+        )
+        journal_append_trace = self._build_journal_append_trace(
+            dispatch_trace=dispatch_trace,
+            journal_append_artifact=journal_append_artifact,
+        )
+        metrics_summary = self._build_metrics_summary(
+            dispatch_trace=dispatch_trace,
+            working_context_summary=result["working_context_summary"],
+            selected_skills=selected_skills,
+            execution_result=execution_result,
+            rollback_result=result["rollback_result"],
+        )
+        evaluation_bundle = build_evaluation_input_bundle(
+            task_contract=task_contract,
+            block_selection_report=block_selection_report,
+            verification_report=verification_report,
+            residual_followup=residual_followup,
+            metrics_summary=metrics_summary,
+            event_trace={
+                "dispatch_trace": dispatch_trace,
+                "execution_status": execution_result["status"],
+            },
+            journal_append_trace=journal_append_trace,
+        )
+
+        result["block_selection_report"] = block_selection_report
+        result["metrics_summary"] = metrics_summary
+        result["evaluation_input_bundle"] = evaluation_bundle.as_dict()
+        result["baseline_compare_results"] = self._build_baseline_compare_results(
+            bundle=evaluation_bundle,
+            baseline_artifacts=baseline_artifacts,
+            baseline_comparator=baseline_comparator,
+        )
+        result["realm_evaluation"] = (
+            realm_evaluator or RealmEvaluator()
+        ).evaluate_bundle(evaluation_bundle)
         return result
 
     def build_execution_plan(
@@ -384,6 +440,172 @@ class Orchestrator:
                 ),
             )
         return state_snapshot
+
+    def _build_block_selection_report(
+        self,
+        *,
+        context_engine,
+        task_contract,
+        state_snapshot,
+        journal_lessons: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        builder = getattr(context_engine, "build_block_selection_report", None)
+        if not callable(builder):
+            return {
+                "included_blocks": [],
+                "excluded_blocks": [],
+                "block_order": [],
+                "limits": {},
+            }
+        return builder(
+            task_contract,
+            state_snapshot,
+            journal_lessons=journal_lessons,
+        )
+
+    def _capture_run_dispatch_trace(
+        self,
+        hook_orchestrator: HookOrchestrator,
+        *,
+        start_index: int,
+    ) -> list[dict[str, Any]]:
+        dispatches = hook_orchestrator.get_recent_dispatches()
+        current_run = dispatches[start_index:] if start_index > 0 else dispatches
+        return [dict(dispatch) for dispatch in current_run]
+
+    def _build_metrics_summary(
+        self,
+        *,
+        dispatch_trace: list[dict[str, Any]],
+        working_context_summary: dict[str, Any],
+        selected_skills: list[str],
+        execution_result: dict[str, Any],
+        rollback_result: dict[str, Any],
+    ) -> dict[str, Any]:
+        context_size = sum(
+            int(working_context_summary.get(field_name, 0) or 0)
+            for field_name in ("task_note_count", "project_note_count", "global_note_count")
+        )
+        trace = {
+            "events": [
+                {
+                    "event_name": str(dispatch.get("event_name") or "unknown"),
+                    "payload": {
+                        "status": dispatch.get("status"),
+                        "error_type": dispatch.get("error_type"),
+                    },
+                }
+                for dispatch in dispatch_trace
+            ],
+            "metrics": [
+                {"metric_name": "token_count", "value": 0, "tags": {}},
+                {"metric_name": "latency_ms", "value": 0, "tags": {}},
+                {"metric_name": "retry_count", "value": 0, "tags": {}},
+                {
+                    "metric_name": "rollback_count",
+                    "value": 1 if rollback_result.get("status") == "rolled_back" else 0,
+                    "tags": {},
+                },
+                {"metric_name": "tool_misuse_count", "value": 0, "tags": {}},
+                {
+                    "metric_name": "execution_failure_count",
+                    "value": 1 if execution_result.get("status") != "success" else 0,
+                    "tags": {},
+                },
+                {
+                    "metric_name": "context_size",
+                    "value": context_size,
+                    "tags": {},
+                },
+                {"metric_name": "human_handoff_count", "value": 0, "tags": {}},
+            ],
+        }
+        if selected_skills:
+            trace["metrics"].append(
+                {
+                    "metric_name": "skill_hit_rate",
+                    "value": 1,
+                    "tags": {},
+                }
+            )
+        return MetricsAggregator().aggregate(trace)
+
+    def _build_journal_append_trace(
+        self,
+        *,
+        dispatch_trace: list[dict[str, Any]],
+        journal_append_artifact: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if journal_append_artifact is None:
+            return None
+
+        journal_dispatch_trace = [
+            dict(dispatch)
+            for dispatch in dispatch_trace
+            if str(dispatch.get("event_name") or "") == "on_journal_append"
+        ]
+        return {
+            "dispatch_trace": journal_dispatch_trace,
+            **self._to_json_value(journal_append_artifact),
+        }
+
+    def _build_baseline_compare_results(
+        self,
+        *,
+        bundle,
+        baseline_artifacts: Mapping[str, Mapping[str, Any] | Sequence[Any]] | None,
+        baseline_comparator: BaselineComparator | None,
+    ) -> dict[str, Any]:
+        if not baseline_artifacts:
+            return {
+                "status": "not_requested",
+                "compared_artifact_types": [],
+                "artifact_results": {},
+            }
+
+        comparator = baseline_comparator or BaselineComparator()
+        artifact_results: dict[str, dict[str, Any]] = {}
+        for artifact_type, baseline in baseline_artifacts.items():
+            normalized_artifact_type = str(artifact_type)
+            try:
+                artifact_results[normalized_artifact_type] = comparator.compare_bundle_artifact(
+                    bundle,
+                    self._extract_baseline_payload(baseline),
+                    artifact_type=normalized_artifact_type,
+                )
+            except Exception as exc:
+                artifact_results[normalized_artifact_type] = {
+                    "artifact_type": normalized_artifact_type,
+                    "status": "error",
+                    "missing_fields": [],
+                    "unexpected_fields": [],
+                    "type_mismatches": [],
+                    "value_drifts": [],
+                    "summary": f"baseline compare failed: {exc}",
+                    "reason_codes": [type(exc).__name__],
+                }
+
+        status_counts: dict[str, int] = {}
+        for artifact_result in artifact_results.values():
+            artifact_status = str(artifact_result.get("status") or "unknown")
+            status_counts[artifact_status] = status_counts.get(artifact_status, 0) + 1
+        return {
+            "status": "completed",
+            "compared_artifact_types": list(artifact_results.keys()),
+            "artifact_results": artifact_results,
+            "status_counts": status_counts,
+        }
+
+    def _extract_baseline_payload(
+        self,
+        baseline: Mapping[str, Any] | Sequence[Any],
+    ) -> Mapping[str, Any] | Sequence[Any]:
+        if isinstance(baseline, Mapping) and "data" in baseline and "status" in baseline:
+            baseline_status = str(baseline.get("status") or "")
+            if baseline_status != "ok":
+                raise ValueError("baseline load result is not usable for comparison")
+            return baseline.get("data")
+        return baseline
 
     def _load_skills(self, skill_loader, task_contract, working_context) -> list[str]:
         if skill_loader is None:
@@ -695,13 +917,16 @@ class Orchestrator:
         sandbox_result: dict[str, Any] | None,
         rollback_result: dict[str, Any] | None,
         read_count: int,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         if learning_journal is None:
-            return {
-                "status": "disabled",
-                "read_count": read_count,
-                "written_entry_id": None,
-            }
+            return (
+                {
+                    "status": "disabled",
+                    "read_count": read_count,
+                    "written_entry_id": None,
+                },
+                None,
+            )
 
         entry = learning_journal.build_lesson_entry(
             task_id=task_contract.task_id,
@@ -729,12 +954,18 @@ class Orchestrator:
             hook_orchestrator.unregister("on_journal_append", persist_journal_entry)
 
         appended = dict(results[-1])
-        return {
+        learning_journal_result = {
             "status": "written",
             "read_count": read_count,
             "written_entry_id": appended["entry_id"],
             "written_source": appended["source"],
         }
+        journal_append_artifact = {
+            "payload": self._to_json_value(payload),
+            "journal_entry": appended,
+            "learning_journal": learning_journal_result,
+        }
+        return learning_journal_result, journal_append_artifact
 
     def _apply_minimal_writeback(
         self,

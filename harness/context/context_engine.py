@@ -2,6 +2,7 @@
 
 from dataclasses import fields, is_dataclass
 from enum import Enum
+from typing import Any
 import re
 
 from harness.state.models import TaskContract, TaskBlock, WorkingContext
@@ -9,13 +10,34 @@ from harness.state.state_manager import StateSnapshot
 
 
 class ContextEngine:
-    """Assemble the smallest useful working context from structured state."""
+    """Assemble the smallest useful working context from structured state.
+
+    v0.4 keeps selection explicit and small:
+    - task state is primary
+    - distilled summary is a compressed supplement, not a replacement for state
+    - residual state is included only when it changes the current decision surface
+    - journal lessons are active-only supplements and never a dominant context source
+    - archived lessons and raw chat history stay out by default
+    """
+
+    BLOCK_PRIORITY = {
+        "task_contract": 0,
+        "task_block": 1,
+        "distilled_summary": 2,
+        "residual_state": 3,
+        "project_block": 4,
+        "global_state": 5,
+        "journal_lessons_active": 6,
+    }
 
     MAX_TASK_NOTES = 6
+    MAX_TASK_BLOCK_NOTES = 5
+    MAX_SUMMARY_NOTES = 1
     MAX_PROJECT_NOTES = 3
     MAX_GLOBAL_NOTES = 3
     MAX_TOOL_RESULTS = 3
     MAX_JOURNAL_LESSONS = 2
+    MAX_RESIDUAL_PACKETS = 1
 
     def build_working_context(
         self,
@@ -25,28 +47,192 @@ class ContextEngine:
         recent_tool_results: list[object] | None = None,
         journal_lessons: list[object] | None = None,
     ) -> WorkingContext:
-        task_notes = self._build_task_notes(
-            state_snapshot.task_block,
+        selection = self.select_context_blocks(
+            task_contract,
+            state_snapshot,
             distilled_summary=distilled_summary,
+            journal_lessons=journal_lessons,
         )
-        project_notes = self._build_project_notes(task_contract, state_snapshot)
-        global_notes = self._build_global_notes(task_contract, state_snapshot)
-        retrieval_packets = self.prune_stale_items(
+        pruned = self.prune_context_blocks(selection)
+        tool_packets = self.prune_stale_items(
             task_contract,
             state_snapshot,
             recent_tool_results=recent_tool_results or [],
         )
-        retrieval_packets.extend(self._build_journal_packets(journal_lessons or []))
+        retrieval_packets = pruned["residual_packets"] + tool_packets + pruned["journal_packets"]
 
         return WorkingContext(
             task_contract=task_contract,
-            selected_global_notes=global_notes,
-            selected_project_notes=project_notes,
-            selected_task_notes=task_notes,
+            selected_global_notes=pruned["global_notes"],
+            selected_project_notes=pruned["project_notes"],
+            selected_task_notes=pruned["task_notes"],
             active_skills=[],
             tool_signatures=list(task_contract.allowed_tools),
             retrieval_packets=retrieval_packets,
         )
+
+    def select_context_blocks(
+        self,
+        task_contract: TaskContract,
+        state_snapshot: StateSnapshot,
+        *,
+        distilled_summary: str | None = None,
+        journal_lessons: list[object] | None = None,
+    ) -> dict[str, Any]:
+        task_block_notes = self._build_task_block_notes(state_snapshot.task_block)
+        summary_notes = self._build_summary_notes(distilled_summary)
+        residual_notes = self._build_residual_notes(state_snapshot.task_block)
+        project_notes = self._build_project_notes(task_contract, state_snapshot)
+        global_notes = self._build_global_notes(task_contract, state_snapshot)
+        journal_packets, journal_meta = self._build_journal_packets(journal_lessons or [])
+
+        blocks = {
+            "task_contract": self._make_block(
+                "task_contract",
+                usage="boundary",
+                content=task_contract,
+                included=True,
+                reason="contract_boundary_always_included",
+                max_items=1,
+            ),
+            "task_block": self._make_block(
+                "task_block",
+                usage="primary_notes",
+                content=task_block_notes,
+                included=bool(task_block_notes),
+                reason=(
+                    "task_state_prioritized"
+                    if task_block_notes
+                    else "task_block_empty"
+                ),
+                max_items=self.MAX_TASK_BLOCK_NOTES,
+            ),
+            "distilled_summary": self._make_block(
+                "distilled_summary",
+                usage="supplement_note",
+                content=summary_notes,
+                included=bool(summary_notes),
+                reason=(
+                    "summary_as_compressed_supplement"
+                    if summary_notes
+                    else "no_distilled_summary"
+                ),
+                max_items=self.MAX_SUMMARY_NOTES,
+            ),
+            "residual_state": self._make_block(
+                "residual_state",
+                usage="supplement_packet",
+                content=residual_notes,
+                included=bool(residual_notes),
+                reason=(
+                    "residual_state_relevant_to_current_decision"
+                    if residual_notes
+                    else "residual_state_not_actionable"
+                ),
+                max_items=self.MAX_RESIDUAL_PACKETS,
+            ),
+            "project_block": self._make_block(
+                "project_block",
+                usage="supporting_notes",
+                content=project_notes,
+                included=bool(project_notes),
+                reason=(
+                    "project_context_relevant_after_task_state"
+                    if project_notes
+                    else "no_relevant_project_context"
+                ),
+                max_items=self.MAX_PROJECT_NOTES,
+            ),
+            "global_state": self._make_block(
+                "global_state",
+                usage="supporting_notes",
+                content=global_notes,
+                included=bool(global_notes),
+                reason=(
+                    "global_constraints_relevant_after_task_state"
+                    if global_notes
+                    else "no_relevant_global_state"
+                ),
+                max_items=self.MAX_GLOBAL_NOTES,
+            ),
+            "journal_lessons_active": self._make_block(
+                "journal_lessons_active",
+                usage="supplement_packet",
+                content=journal_packets,
+                included=bool(journal_packets),
+                reason=self._journal_reason(journal_packets, journal_meta),
+                max_items=self.MAX_JOURNAL_LESSONS,
+            ),
+        }
+        return {
+            "blocks": blocks,
+            "selection_order": [
+                name
+                for name, _ in sorted(
+                    self.BLOCK_PRIORITY.items(),
+                    key=lambda item: item[1],
+                )
+            ],
+        }
+
+    def prune_context_blocks(self, selection: Mapping[str, Any]) -> dict[str, list[str]]:
+        blocks = selection["blocks"]
+        task_notes = list(blocks["task_block"]["content"][: self.MAX_TASK_BLOCK_NOTES])
+        task_notes.extend(blocks["distilled_summary"]["content"][: self.MAX_SUMMARY_NOTES])
+        task_notes = task_notes[: self.MAX_TASK_NOTES]
+
+        return {
+            "task_notes": task_notes,
+            "project_notes": list(blocks["project_block"]["content"][: self.MAX_PROJECT_NOTES]),
+            "global_notes": list(blocks["global_state"]["content"][: self.MAX_GLOBAL_NOTES]),
+            "journal_packets": list(
+                blocks["journal_lessons_active"]["content"][: self.MAX_JOURNAL_LESSONS]
+            ),
+            "residual_packets": list(blocks["residual_state"]["content"][: self.MAX_RESIDUAL_PACKETS]),
+        }
+
+    def build_block_selection_report(
+        self,
+        task_contract: TaskContract,
+        state_snapshot: StateSnapshot,
+        *,
+        distilled_summary: str | None = None,
+        journal_lessons: list[object] | None = None,
+    ) -> dict[str, Any]:
+        selection = self.select_context_blocks(
+            task_contract,
+            state_snapshot,
+            distilled_summary=distilled_summary,
+            journal_lessons=journal_lessons,
+        )
+        report = {
+            "included_blocks": [],
+            "excluded_blocks": [],
+            "block_order": list(selection["selection_order"]),
+            "limits": {
+                "task_block": self.MAX_TASK_BLOCK_NOTES,
+                "distilled_summary": self.MAX_SUMMARY_NOTES,
+                "project_block": self.MAX_PROJECT_NOTES,
+                "global_state": self.MAX_GLOBAL_NOTES,
+                "journal_lessons_active": self.MAX_JOURNAL_LESSONS,
+                "residual_state": self.MAX_RESIDUAL_PACKETS,
+            },
+        }
+
+        for block_name in selection["selection_order"]:
+            block = selection["blocks"][block_name]
+            row = {
+                "block": block_name,
+                "priority": block["priority"],
+                "usage": block["usage"],
+                "reason": block["reason"],
+                "item_count": block["item_count"],
+            }
+            if block["included"]:
+                report["included_blocks"].append(row)
+            else:
+                report["excluded_blocks"].append(row)
+        return report
 
     def prune_stale_items(
         self,
@@ -79,16 +265,34 @@ class ContextEngine:
     def serialize_working_context(self, working_context: WorkingContext) -> dict[str, object]:
         return self._to_json_value(working_context)
 
-    def _build_task_notes(
+    def _make_block(
         self,
-        task_block: TaskBlock,
+        block_name: str,
         *,
-        distilled_summary: str | None,
-    ) -> list[str]:
-        notes: list[str] = [f"Task goal: {task_block.current_goal}"]
-        if distilled_summary and distilled_summary.strip():
-            notes.append(f"Distilled summary: {distilled_summary.strip()}")
+        usage: str,
+        content: object,
+        included: bool,
+        reason: str,
+        max_items: int,
+    ) -> dict[str, object]:
+        if isinstance(content, list):
+            item_count = len(content)
+        elif content is None:
+            item_count = 0
+        else:
+            item_count = 1
+        return {
+            "priority": self.BLOCK_PRIORITY[block_name],
+            "usage": usage,
+            "content": content,
+            "included": included,
+            "reason": reason,
+            "max_items": max_items,
+            "item_count": item_count,
+        }
 
+    def _build_task_block_notes(self, task_block: TaskBlock) -> list[str]:
+        notes: list[str] = [f"Task goal: {task_block.current_goal}"]
         for blocker in task_block.blockers:
             notes.append(f"Blocker: {blocker}")
         for next_step in task_block.next_steps:
@@ -97,8 +301,41 @@ class ContextEngine:
             notes.append(f"Known risk: {risk}")
         for assumption in task_block.assumptions:
             notes.append(f"Assumption: {assumption}")
+        return notes[: self.MAX_TASK_BLOCK_NOTES]
 
-        return notes[: self.MAX_TASK_NOTES]
+    def _build_summary_notes(self, distilled_summary: str | None) -> list[str]:
+        if not distilled_summary or not distilled_summary.strip():
+            return []
+        return [f"Distilled summary: {distilled_summary.strip()}"]
+
+    def _build_residual_notes(self, task_block: TaskBlock) -> list[str]:
+        if not self._should_include_residual_state(task_block):
+            return []
+
+        notes: list[str] = []
+        residual = task_block.residual_risk or {}
+        if isinstance(residual, dict):
+            risk_level = str(
+                residual.get("reassessed_level") or residual.get("previous_level") or ""
+            ).strip().lower()
+            if risk_level:
+                notes.append(f"Residual state: risk {risk_level}")
+        if task_block.followup_required:
+            notes.append("Residual state: follow-up required")
+        if task_block.governance_required:
+            notes.append("Residual state: governance review required")
+        return notes[: self.MAX_RESIDUAL_PACKETS]
+
+    def _should_include_residual_state(self, task_block: TaskBlock) -> bool:
+        if task_block.followup_required or task_block.governance_required:
+            return True
+        residual = task_block.residual_risk
+        if not isinstance(residual, dict):
+            return False
+        risk_level = str(
+            residual.get("reassessed_level") or residual.get("previous_level") or ""
+        ).strip().lower()
+        return risk_level in {"medium", "high"}
 
     def _build_project_notes(
         self,
@@ -165,18 +402,40 @@ class ContextEngine:
             limit=self.MAX_GLOBAL_NOTES,
         )
 
-    def _build_journal_packets(self, journal_lessons: list[object]) -> list[str]:
+    def _build_journal_packets(self, journal_lessons: list[object]) -> tuple[list[str], dict[str, int]]:
         packets: list[str] = []
+        seen: set[str] = set()
+        archived_skipped = 0
+        invalid_skipped = 0
+
         for lesson in journal_lessons:
             normalized = self._normalize_journal_lesson(lesson)
             if normalized is None:
+                if isinstance(lesson, dict) and str(lesson.get("archive_status") or "").strip().lower() == "archived":
+                    archived_skipped += 1
+                else:
+                    invalid_skipped += 1
                 continue
-            if normalized in packets:
+            if normalized in seen:
                 continue
             packets.append(normalized)
+            seen.add(normalized)
             if len(packets) >= self.MAX_JOURNAL_LESSONS:
                 break
-        return packets
+
+        return packets, {
+            "archived_skipped": archived_skipped,
+            "invalid_skipped": invalid_skipped,
+        }
+
+    def _journal_reason(self, journal_packets: list[str], journal_meta: dict[str, int]) -> str:
+        if journal_packets and journal_meta["archived_skipped"] > 0:
+            return "active_lessons_selected_archived_excluded"
+        if journal_packets:
+            return "active_lessons_selected_as_supplement"
+        if journal_meta["archived_skipped"] > 0:
+            return "archived_lessons_excluded_by_default"
+        return "no_active_journal_lessons"
 
     def _select_notes(
         self,
@@ -262,6 +521,10 @@ class ContextEngine:
             return f"Learning lesson: {text}" if text else None
 
         if not isinstance(item, dict):
+            return None
+
+        archive_status = str(item.get("archive_status") or "active").strip().lower()
+        if archive_status == "archived":
             return None
 
         lesson = str(item.get("lesson") or "").strip()

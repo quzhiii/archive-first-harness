@@ -1,0 +1,10 @@
+﻿__pycache__/
+*.py[cod]
+.claude/
+/tests/tmp*/
+/tests/_tmp*/
+/artifacts/_baseline_run/
+/artifacts/_v02_freeze_run/
+/artifacts/contracts/
+/artifacts/state/
+/artifacts/baselines/v03/tmp*/

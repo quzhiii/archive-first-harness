@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "automatic_action": "none",
+    "metric_count": 9,
+    "source": "v0.1 rule-based realm evaluator"
+  },
+  "reason_codes": [
+    "stable_baseline"
+  ],
+  "recommendation": "keep",
+  "requires_human_review": false,
+  "status": "ok",
+  "summary": "Current signals are stable enough to keep the component in the v0.1 path."
+}

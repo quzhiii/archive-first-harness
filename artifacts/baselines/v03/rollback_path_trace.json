@@ -1,0 +1,122 @@
+{
+  "dispatch_trace": [
+    {
+      "error_type": null,
+      "event_id": "evt-6",
+      "event_name": "on_sandbox_required",
+      "handler_count": 0,
+      "status": "success",
+      "timestamp": "TIMESTAMP_6"
+    },
+    {
+      "error_type": null,
+      "event_id": "evt-7",
+      "event_name": "on_verification_report",
+      "handler_count": 0,
+      "status": "success",
+      "timestamp": "TIMESTAMP_7"
+    },
+    {
+      "error_type": null,
+      "event_id": "evt-8",
+      "event_name": "on_residual_followup",
+      "handler_count": 0,
+      "status": "success",
+      "timestamp": "TIMESTAMP_8"
+    },
+    {
+      "error_type": null,
+      "event_id": "evt-9",
+      "event_name": "on_governance_check",
+      "handler_count": 0,
+      "status": "success",
+      "timestamp": "TIMESTAMP_9"
+    },
+    {
+      "error_type": null,
+      "event_id": "evt-10",
+      "event_name": "on_journal_append",
+      "handler_count": 1,
+      "status": "success",
+      "timestamp": "TIMESTAMP_10"
+    }
+  ],
+  "journal_entry": {
+    "confidence": 0.9,
+    "created_at": "CREATED_AT_2",
+    "entry_id": "lesson-2",
+    "lesson": "For coding tasks, if isolated execution fails and rollback is triggered, inspect the gated write path before retrying or widening scope.",
+    "source": "rollback",
+    "tags": [
+      "coding",
+      "rollback",
+      "tool:write_file",
+      "error:execution_error",
+      "risk:high",
+      "followup_required",
+      "sandbox_required",
+      "sandbox_failed",
+      "rollback_triggered"
+    ],
+    "task_id": "task-v03-rollback",
+    "task_type": "coding"
+  },
+  "rollback_result": {
+    "restored_state": {
+      "status": "pending",
+      "task_id": "task-v03-rollback",
+      "tool_name": "write_file"
+    },
+    "snapshot_ref": "snapshot-2",
+    "status": "rolled_back"
+  },
+  "sandbox_result": {
+    "action": "execute_step",
+    "error": {
+      "message": "forced failure for v0.3 integration smoke",
+      "type": "execution_error"
+    },
+    "metadata": {
+      "dry_run": false,
+      "isolated": true,
+      "runner_used": true
+    },
+    "output": {
+      "execution_result": {
+        "artifacts": [],
+        "error": {
+          "message": "forced failure for v0.3 integration smoke",
+          "type": "execution_error"
+        },
+        "metadata": {
+          "tool_input": {
+            "content": "Task goal: Run task-v03-rollback integration flow",
+            "path": "artifacts/output.txt"
+          }
+        },
+        "output": null,
+        "status": "error",
+        "tool_name": "write_file"
+      }
+    },
+    "payload": {
+      "available_tools": [
+        "write_file"
+      ],
+      "reason_codes": [
+        "high_write_permission",
+        "high_risk_level"
+      ],
+      "step": {
+        "tool_input": {
+          "content": "Task goal: Run task-v03-rollback integration flow",
+          "path": "artifacts/output.txt"
+        },
+        "tool_name": "write_file"
+      }
+    },
+    "snapshot_ref": "snapshot-2",
+    "status": "error"
+  },
+  "scenario": "sandbox_failure_with_rollback"
+}

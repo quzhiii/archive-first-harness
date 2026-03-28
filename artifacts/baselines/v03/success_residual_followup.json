@@ -1,0 +1,39 @@
+{
+  "auto_execution": "none",
+  "governance": {
+    "approved": true,
+    "issues": [],
+    "requires_governance_override": false,
+    "status": "clear"
+  },
+  "methodology_suggestion": null,
+  "model_suggestion": null,
+  "reassessment": {
+    "budget_remaining": "medium",
+    "changed": false,
+    "context_health": "healthy",
+    "evidence_quality": "adequate",
+    "failure_tier": "none",
+    "metadata": {
+      "execution_status": "success",
+      "issue_count": 0,
+      "source": "verifier",
+      "warning_count": 0
+    },
+    "needs_followup": false,
+    "previous_level": "low",
+    "reason_codes": [
+      "execution_clean"
+    ],
+    "reassessed_level": "low",
+    "status": "ok",
+    "tool_outcome": "success"
+  },
+  "status": "ok",
+  "telemetry_payload": {
+    "followup_required": false,
+    "governance_required": false,
+    "residual_risk_changed": false,
+    "residual_risk_level": "low"
+  }
+}

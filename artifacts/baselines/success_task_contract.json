@@ -1,0 +1,43 @@
+{
+  "allowed_tools": [
+    "search",
+    "read_files"
+  ],
+  "contract_id": "baseline-contract-success",
+  "escalation_budget": "low",
+  "escalation_policy": [
+    "pause and request clarification",
+    "narrow the task to the smallest verifiable scope"
+  ],
+  "escalation_threshold": [
+    "success criteria cannot be checked with the available information",
+    "the requested action exceeds the current permission or budget"
+  ],
+  "expected_artifacts": [
+    "answer"
+  ],
+  "failure_escalation_policy": [
+    "do not repeat the same failing path without changing inputs or method",
+    "fall back to clarification before widening scope"
+  ],
+  "goal": "Search docs for runtime context",
+  "latency_budget": "low",
+  "methodology_family": "research",
+  "residual_risk_level": "low",
+  "retrieval_budget": "medium",
+  "schema_version": "v1",
+  "stop_conditions": [
+    "the task remains too ambiguous to verify",
+    "the required action exceeds the allowed permission level",
+    "the available budget is exhausted before the result can be validated"
+  ],
+  "success_criteria": [
+    "Return the requested information relevant to the user task.",
+    "Stay within the stated scope of: Search docs for runtime context."
+  ],
+  "task_type": "retrieval",
+  "token_budget": "low",
+  "uncertainty_level": "low",
+  "verification_budget": "low",
+  "write_permission_level": "query"
+}

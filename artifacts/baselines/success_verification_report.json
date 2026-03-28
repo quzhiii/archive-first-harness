@@ -1,0 +1,15 @@
+{
+  "issues": [],
+  "metadata": {
+    "contract_id": "baseline-contract-success",
+    "execution_status": "success",
+    "issue_count": 0,
+    "task_type": "retrieval",
+    "warning_count": 0
+  },
+  "needs_followup": false,
+  "passed": true,
+  "residual_risk_hint": "low",
+  "status": "passed",
+  "warnings": []
+}

@@ -1,0 +1,24 @@
+{
+  "dispatch_trace": [
+    {
+      "error_type": null,
+      "event_id": "evt-1",
+      "event_name": "on_verification_report",
+      "handler_count": 0,
+      "status": "success",
+      "timestamp": "TIMESTAMP_1"
+    },
+    {
+      "error_type": null,
+      "event_id": "evt-2",
+      "event_name": "on_journal_append",
+      "handler_count": 1,
+      "status": "success",
+      "timestamp": "TIMESTAMP_2"
+    }
+  ],
+  "execution_status": "success",
+  "journal_source": "success",
+  "sandbox_triggered": false,
+  "scenario": "success_low_risk"
+}

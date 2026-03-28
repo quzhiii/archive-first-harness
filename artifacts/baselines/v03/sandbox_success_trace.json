@@ -1,0 +1,102 @@
+{
+  "dispatch_trace": [
+    {
+      "error_type": null,
+      "event_id": "evt-3",
+      "event_name": "on_sandbox_required",
+      "handler_count": 0,
+      "status": "success",
+      "timestamp": "TIMESTAMP_3"
+    },
+    {
+      "error_type": null,
+      "event_id": "evt-4",
+      "event_name": "on_verification_report",
+      "handler_count": 0,
+      "status": "success",
+      "timestamp": "TIMESTAMP_4"
+    },
+    {
+      "error_type": null,
+      "event_id": "evt-5",
+      "event_name": "on_journal_append",
+      "handler_count": 1,
+      "status": "success",
+      "timestamp": "TIMESTAMP_5"
+    }
+  ],
+  "journal_entry": {
+    "confidence": 0.85,
+    "created_at": "CREATED_AT_1",
+    "entry_id": "lesson-1",
+    "lesson": "For coding tasks, keep high-risk or write-capable steps isolated and validate the sandboxed outcome before promoting further changes.",
+    "source": "sandbox",
+    "tags": [
+      "coding",
+      "sandbox",
+      "tool:write_file",
+      "risk:low",
+      "sandbox_required",
+      "sandbox_success"
+    ],
+    "task_id": "task-v03-sandbox-success",
+    "task_type": "coding"
+  },
+  "rollback_result": {
+    "reason": "sandbox_succeeded",
+    "status": "not_required"
+  },
+  "sandbox_result": {
+    "action": "execute_step",
+    "error": null,
+    "metadata": {
+      "dry_run": false,
+      "isolated": true,
+      "runner_used": true
+    },
+    "output": {
+      "execution_result": {
+        "artifacts": [
+          {
+            "path": "artifacts/output.txt",
+            "type": "file_change"
+          }
+        ],
+        "error": null,
+        "metadata": {
+          "available_tool_count": 1,
+          "task_note_count": 2,
+          "tool_input": {
+            "content": "Task goal: Run task-v03-sandbox-success integration flow",
+            "path": "artifacts/output.txt"
+          }
+        },
+        "output": {
+          "bytes_written": 56,
+          "path": "artifacts/output.txt",
+          "summary": "stub-write:artifacts/output.txt"
+        },
+        "status": "success",
+        "tool_name": "write_file"
+      }
+    },
+    "payload": {
+      "available_tools": [
+        "write_file"
+      ],
+      "reason_codes": [
+        "high_write_permission"
+      ],
+      "step": {
+        "tool_input": {
+          "content": "Task goal: Run task-v03-sandbox-success integration flow",
+          "path": "artifacts/output.txt"
+        },
+        "tool_name": "write_file"
+      }
+    },
+    "snapshot_ref": "snapshot-1",
+    "status": "success"
+  },
+  "scenario": "sandbox_success"
+}

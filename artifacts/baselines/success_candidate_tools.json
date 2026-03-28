@@ -1,0 +1,22 @@
+[
+  {
+    "description": "Read a file and return a lightweight preview.",
+    "name": "read_file",
+    "risk_level": "low",
+    "signature": {
+      "input": {
+        "path": "str"
+      }
+    }
+  },
+  {
+    "description": "Search project notes or documentation.",
+    "name": "search_docs",
+    "risk_level": "low",
+    "signature": {
+      "input": {
+        "query": "str"
+      }
+    }
+  }
+]

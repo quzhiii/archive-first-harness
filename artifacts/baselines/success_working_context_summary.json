@@ -1,0 +1,10 @@
+{
+  "global_note_count": 0,
+  "project_note_count": 0,
+  "retrieval_packet_count": 0,
+  "task_note_count": 2,
+  "tool_signatures": [
+    "search",
+    "read_files"
+  ]
+}

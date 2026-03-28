@@ -1,0 +1,31 @@
+{
+  "journal_lessons": [
+    {
+      "confidence": 0.65,
+      "created_at": "2026-03-27T05:11:01.254413+00:00",
+      "entry_id": "lesson-21d478e799e2462c9e323793711e8b19",
+      "lesson": "For coding tasks, keep the scope tied to the success criteria and verify the output after using read_file.",
+      "source": "success",
+      "tags": [
+        "coding",
+        "success",
+        "tool:read_file",
+        "risk:medium"
+      ],
+      "task_id": "task-272ea6206cc344148387d9b54aba2f74",
+      "task_type": "coding"
+    }
+  ],
+  "journal_read_count": 1,
+  "task_id": "task-f6b7c510191347e9aedf3a1e85b968d1",
+  "task_type": "coding",
+  "working_context_retrieval_packets": [
+    "Learning lesson (success): For coding tasks, keep the scope tied to the success criteria and verify the output after using read_file."
+  ],
+  "working_context_summary": {
+    "global_note_count": 0,
+    "project_note_count": 0,
+    "retrieval_packet_count": 1,
+    "task_note_count": 1
+  }
+}

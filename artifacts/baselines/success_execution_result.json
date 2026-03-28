@@ -1,0 +1,25 @@
+{
+  "artifacts": [],
+  "error": null,
+  "metadata": {
+    "available_tool_count": 1,
+    "cleanup": {
+      "removed_context": true,
+      "status": "cleaned",
+      "tool_name": "search_docs"
+    },
+    "task_note_count": 2,
+    "tool_input": {
+      "query": "Search docs for runtime context"
+    }
+  },
+  "output": {
+    "matches": [
+      "match-for:Search docs for runtime context"
+    ],
+    "query": "Search docs for runtime context",
+    "summary": "stub-search:Search docs for runtime context"
+  },
+  "status": "success",
+  "tool_name": "search_docs"
+}

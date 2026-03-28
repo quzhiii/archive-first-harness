@@ -1,0 +1,107 @@
+{
+  "dispatch_trace": [
+    {
+      "error_type": null,
+      "event_id": "evt-11",
+      "event_name": "on_verification_report",
+      "handler_count": 0,
+      "status": "success",
+      "timestamp": "TIMESTAMP_11"
+    },
+    {
+      "error_type": null,
+      "event_id": "evt-12",
+      "event_name": "on_residual_followup",
+      "handler_count": 0,
+      "status": "success",
+      "timestamp": "TIMESTAMP_12"
+    },
+    {
+      "error_type": null,
+      "event_id": "evt-13",
+      "event_name": "on_governance_check",
+      "handler_count": 0,
+      "status": "success",
+      "timestamp": "TIMESTAMP_13"
+    },
+    {
+      "error_type": null,
+      "event_id": "evt-14",
+      "event_name": "on_journal_append",
+      "handler_count": 1,
+      "status": "success",
+      "timestamp": "TIMESTAMP_14"
+    }
+  ],
+  "residual_followup": {
+    "auto_execution": "none",
+    "governance": {
+      "approved": false,
+      "issues": [
+        {
+          "candidate": "debug",
+          "code": "methodology_out_of_contract",
+          "contract_methodology": "architecture",
+          "message": "methodology suggestion exceeds the contract boundary and requires governance review"
+        }
+      ],
+      "requires_governance_override": true,
+      "status": "review_required"
+    },
+    "methodology_suggestion": {
+      "expected_next_action": "request_governance_override_for_debug",
+      "is_within_contract": false,
+      "requires_governance_override": true,
+      "selected_methodology": "debug",
+      "selection_reason": "fallback_debug_for_failure_signal"
+    },
+    "model_suggestion": {
+      "escalation_allowed": true,
+      "hysteresis_applied": false,
+      "metadata": {
+        "latency_budget": "low",
+        "previous_slot": "balanced",
+        "residual_risk_level": "high",
+        "task_type": "planning",
+        "token_budget": "low",
+        "uncertainty_level": "low"
+      },
+      "reason_codes": [
+        "task_type_requires_balanced_slot",
+        "latency_constrained",
+        "high_residual_risk"
+      ],
+      "selected_slot": "strong"
+    },
+    "reassessment": {
+      "budget_remaining": "low",
+      "changed": true,
+      "context_health": "degraded",
+      "evidence_quality": "low",
+      "failure_tier": "execution_error",
+      "metadata": {
+        "execution_status": "error",
+        "issue_count": 1,
+        "source": "verifier",
+        "warning_count": 0
+      },
+      "needs_followup": true,
+      "previous_level": "low",
+      "reason_codes": [
+        "execution_failed",
+        "verification_issues_present"
+      ],
+      "reassessed_level": "high",
+      "status": "ok",
+      "tool_outcome": "error"
+    },
+    "status": "ok",
+    "telemetry_payload": {
+      "followup_required": true,
+      "governance_required": true,
+      "residual_risk_changed": true,
+      "residual_risk_level": "high"
+    }
+  },
+  "scenario": "governance_followup"
+}

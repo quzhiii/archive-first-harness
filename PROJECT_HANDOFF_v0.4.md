@@ -1,15 +1,19 @@
-﻿# PROJECT_HANDOFF_v0.4
+# PROJECT_HANDOFF_v0.4
 
-This file is a compact handoff note for continuing the AI agent runtime harness in a new chat, a new model, or another coding agent such as Claude Code.
+This handoff is the canonical resume note for continuing the AI agent runtime harness from the frozen `v0.4` baseline in a new chat, a new model, or another coding agent such as Claude Code.
 
 ## 1. Current Snapshot
 
 - Project: `AI agent runtime harness`
 - Architecture boundary: `entrypoints/ -> runtime/ -> harness/`
-- Current committed baseline: `B v0.3`
-- Git tag: `b-v0.3-baseline`
-- Current `HEAD`: `385d669` (`Freeze B v0.3 baseline`)
-- Important status: `v0.4` work exists in the working tree and is not committed yet
+- Current frozen baseline: `B v0.4`
+- Stable tags:
+  - `b-v0.3-baseline`
+  - `b-v0.4-baseline`
+- `v0.4` checkpoint commit: `d263cba9d3196453b7abc4cc4836532eaaee716a` (`Checkpoint v0.4 rounds 1-5`)
+- Current `HEAD`: this closeout baseline commit
+- Working tree expectation: clean
+- Full-suite verification: `python -m unittest discover -s tests -p "test_*.py"` -> `Ran 172 tests`, `OK`
 
 ## 2. What Is Already Done
 
@@ -41,10 +45,12 @@ This file is a compact handoff note for continuing the AI agent runtime harness 
 - v0.3 smoke scenarios and baseline artifacts
 - v0.3 freeze docs and tag
 
-## 3. What Has Been Implemented In v0.4 So Far
+## 3. What Has Been Implemented In v0.4
+
+All `v0.4` rounds below are committed and frozen at the `B v0.4` baseline.
 
 ### v0.4 Round 1: Learning Journal Quality Control
-Status: implemented in working tree, not committed
+Status: committed / frozen
 
 Files:
 - `harness/journal/learning_journal.py`
@@ -52,28 +58,31 @@ Files:
 
 Key behavior:
 - `active` / `archived` split
-- fingerprint-based dedup
-- TTL-based expiry -> archive, not delete
-- default reads exclude archived
-- low-confidence and duplicate entries can be archived
-- journal boundary remains narrow and does not mirror runtime/state objects
+- Fingerprint-based dedup
+- TTL-based expiry archives instead of deleting
+- Default reads exclude archived lessons
+- Low-confidence and duplicate entries can be archived
+
+Boundaries preserved:
+- Journal remains a lesson store, not task state, residual history, or sandbox / rollback logs
+- Archived lessons do not re-enter normal working context by default
 
 ### v0.4 Round 2: Baseline Compare / Regression Diff
-Status: implemented in working tree, not committed
+Status: committed / frozen
 
 Files:
 - `harness/evaluation/baseline_compare.py`
 - `tests/test_baseline_compare.py`
 
 Key behavior:
-- explicit baseline JSON loading only
-- supports:
+- Explicit baseline JSON loading only
+- Supports:
   - `verification_report`
   - `residual_followup`
   - `metrics_summary`
   - `event_trace`
   - `journal_append_trace`
-- outputs structured diff with:
+- Outputs a structured diff with:
   - `artifact_type`
   - `status`
   - `missing_fields`
@@ -82,20 +91,24 @@ Key behavior:
   - `value_drifts`
   - `summary`
   - `reason_codes`
-- drift classes:
+- Drift classes:
   - `compatible`
   - `warning`
   - `breaking`
 
+Boundaries preserved:
+- Compare output is advisory-only
+- No dashboard, gatekeeping pipeline, or runtime control hook was introduced
+
 ### v0.4 Round 3: Block-Level Context Selection Refinement
-Status: implemented in working tree, not committed
+Status: committed / frozen
 
 Files:
 - `harness/context/context_engine.py`
 - `tests/test_context_block_selection.py`
 
 Key behavior:
-- explicit context block sources:
+- Explicit context block sources:
   - `task_contract`
   - `task_block`
   - `distilled_summary`
@@ -103,14 +116,17 @@ Key behavior:
   - `project_block`
   - `global_state`
   - `journal_lessons_active`
-- explicit priority ordering
-- archived journal lessons excluded by default even if passed in
-- residual state only enters when actionable / decision-relevant
-- selection report available via `build_block_selection_report(...)`
-- working context remains small and explainable
+- Explicit priority ordering and pruning
+- Archived journal lessons excluded by default
+- Residual state only enters when decision-relevant
+- Selection report exposed via `build_block_selection_report(...)`
+
+Boundaries preserved:
+- `working_context` stays small and explainable
+- State, summary, journal, and residual remain separated instead of collapsing into a dump
 
 ### v0.4 Round 4: Evaluator Input Unification
-Status: implemented in working tree, not committed
+Status: committed / frozen
 
 Files:
 - `harness/evaluation/evaluation_input.py`
@@ -119,78 +135,63 @@ Files:
 - `tests/test_evaluation_input_bundle.py`
 
 Key behavior:
-- introduces `EvaluationInputBundle`
-- adds pure builders:
+- Introduces `EvaluationInputBundle`
+- Adds pure builders:
   - `build_evaluation_input_bundle(...)`
   - `summarize_task_contract(...)`
   - `summarize_event_trace(...)`
   - `summarize_journal_append_trace(...)`
-- keeps evaluator input boundary explicit:
+- Keeps the evaluator input boundary explicit:
   - `verification_report` / `residual_followup` / `metrics_summary` / `block_selection_report` remain structured artifacts
-  - `event_trace` / `journal_append_trace` enter the bundle only as summaries
+  - `event_trace` / `journal_append_trace` enter only as summaries
   - `task_contract` enters only as a small summary, not a full mirror
-- adds lightweight adapters:
+- Adds lightweight adapters:
   - `to_baseline_artifacts(bundle)`
   - `RealmEvaluator.evaluate_bundle(bundle)`
   - `BaselineComparator.compare_bundle_artifact(bundle, ...)`
-- does not modify orchestrator control flow or widen runtime semantics
+
+Boundaries preserved:
+- Bundle is a read-only evaluation surface, not a new runtime state layer
+- Hooks, traces, and contracts were not expanded into dumps
 
 ### v0.4 Round 5: Runtime Evaluation Integration
-Status: implemented in working tree, not committed
+Status: committed / frozen
 
 Files:
 - `runtime/orchestrator.py`
 - `tests/test_runtime_evaluation_integration.py`
 
 Key behavior:
-- orchestrator now builds `evaluation_input_bundle` after verification, residual follow-up, writeback, and journal append have already settled
-- real runs now expose stable evaluation-facing outputs:
+- Orchestrator builds `evaluation_input_bundle` only after verification, residual follow-up, writeback, and journal append have settled
+- Real runs now expose stable evaluation-facing outputs:
   - `block_selection_report`
   - `metrics_summary`
   - `evaluation_input_bundle`
   - `baseline_compare_results`
   - `realm_evaluation`
-- baseline compare and realm evaluator now consume the same bundle base during a real runtime run
-- compare and evaluator remain advisory-only and do not alter execution flow, sandbox gating, or follow-up routing
-- missing optional inputs remain stable:
+- Baseline compare and realm evaluator consume the same bundle base during a real run
+- Missing optional inputs remain stable:
   - no journal append trace -> bundle still builds
-  - no block selection report builder -> bundle still builds with an empty report
+  - no block selection report -> bundle still builds with an empty report
 
-## 4. Current Working Tree Changes
+Boundaries preserved:
+- Compare and evaluator remain advisory-only
+- Runtime control flow, sandbox gating, and follow-up routing stay unchanged
 
-At the time of writing, `git status --short` shows:
+## 4. Current Verification State
 
-- modified: `harness/context/context_engine.py`
-- modified: `harness/evaluation/realm_evaluator.py`
-- modified: `harness/journal/learning_journal.py`
-- modified: `runtime/orchestrator.py`
-- untracked: `PROJECT_HANDOFF_v0.4.md`
-- untracked: `harness/evaluation/baseline_compare.py`
-- untracked: `harness/evaluation/evaluation_input.py`
-- untracked: `tests/test_baseline_compare.py`
-- untracked: `tests/test_context_block_selection.py`
-- untracked: `tests/test_evaluation_input_bundle.py`
-- untracked: `tests/test_learning_journal_quality_control.py`
-- untracked: `tests/test_runtime_evaluation_integration.py`
-
-Interpretation:
-- v0.3 is frozen and committed
-- v0.4.1 / v0.4.2 / v0.4.3 / v0.4.4 / v0.4.5 are implemented locally but not yet frozen or tagged
-
-## 5. Current Verification State
-
-Last verified command:
+Baseline verification command:
 
 ```bash
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-Last known result:
+Current result:
 
 - `Ran 172 tests`
 - `OK`
 
-Focused verification also passed:
+Focused verification that should still pass:
 
 ```bash
 python -m unittest tests.test_learning_journal_quality_control
@@ -201,9 +202,7 @@ python -m unittest tests.test_realm_evaluator
 python -m unittest tests.test_runtime_evaluation_integration
 ```
 
-This means the current working tree is test-green despite being ahead of the `b-v0.3-baseline` commit.
-
-## 6. Important Files To Read First
+## 5. Important Files To Read First
 
 If another agent takes over, read these first:
 
@@ -211,19 +210,20 @@ If another agent takes over, read these first:
 2. `KNOWN_GAPS_v0.1.md`
 3. `KNOWN_GAPS_v0.2.md`
 4. `KNOWN_GAPS_v0.3.md`
-5. `harness/context/context_engine.py`
-6. `harness/journal/learning_journal.py`
-7. `harness/evaluation/baseline_compare.py`
-8. `harness/evaluation/evaluation_input.py`
-9. `harness/evaluation/realm_evaluator.py`
-10. `runtime/orchestrator.py`
-11. `tests/test_learning_journal_quality_control.py`
-12. `tests/test_baseline_compare.py`
-13. `tests/test_context_block_selection.py`
-14. `tests/test_evaluation_input_bundle.py`
-15. `tests/test_runtime_evaluation_integration.py`
+5. `PROJECT_HANDOFF_v0.4.md`
+6. `harness/context/context_engine.py`
+7. `harness/journal/learning_journal.py`
+8. `harness/evaluation/baseline_compare.py`
+9. `harness/evaluation/evaluation_input.py`
+10. `harness/evaluation/realm_evaluator.py`
+11. `runtime/orchestrator.py`
+12. `tests/test_learning_journal_quality_control.py`
+13. `tests/test_baseline_compare.py`
+14. `tests/test_context_block_selection.py`
+15. `tests/test_evaluation_input_bundle.py`
+16. `tests/test_runtime_evaluation_integration.py`
 
-## 7. Architecture Rules That Must Still Be Preserved
+## 6. Architecture Rules That Must Still Be Preserved
 
 - Keep the one-way boundary: `entrypoints/ -> runtime/ -> harness/`
 - Do not let `harness/` depend on `entrypoints/`
@@ -240,7 +240,7 @@ If another agent takes over, read these first:
 - Keep evaluator input unification as a read-only / summary-only layer, not a new runtime state system
 - Keep compare/evaluator outputs advisory-only after runtime integration
 
-## 8. Explicit Non-Goals Still In Force
+## 7. Explicit Non-Goals Still In Force
 
 Still not implemented, by design:
 
@@ -258,40 +258,47 @@ Still not implemented, by design:
 - dashboard / observability platform
 - CLI / surface wrappers for the v0.4 evaluator bundle
 - automatic compare gating or runtime rerouting from evaluator output
-- v0.5 abilities
+- `workflow_profile` / `mission_profile`
+- broader `v0.5` abilities
 
-## 9. Baseline / Artifact Notes
+## 8. Baseline / Artifact Notes
 
-### v0.3 freeze baseline
-- directory: `artifacts/baselines/v03`
-- baseline rule: only top-level `*.json` are part of the frozen baseline set
-- ignore temporary directories and non-JSON spillover
+### Frozen comparison base
+- The canonical frozen JSON comparison set is still `artifacts/baselines/v03`
+- This remains the stable explicit baseline pack for regression diffing
+- Rule: only top-level `*.json` files under `artifacts/baselines/v03` are part of the frozen set
+
+### v0.4 runtime outputs
+- `v0.4` adds runtime-facing evaluation outputs rather than a second frozen artifact directory:
+  - `evaluation_input_bundle`
+  - `baseline_compare_results`
+  - `realm_evaluation`
+- These outputs are validated by tests and can be observed from real orchestrator runs, but they are not yet frozen as a separate `artifacts/baselines/v04` pack
 
 ### Known temp-dir quirk
-- there was a problematic inaccessible temp directory under `artifacts/baselines/v03/`
-- the repo-level rule is to ignore temp spillover and compare only explicit top-level JSON baselines
-- do not introduce privileged cleanup steps unless there is a real need
+- There is an inaccessible temp directory under `artifacts/baselines/v03/`
+- The repo rule is unchanged: ignore temp spillover and compare only explicit top-level JSON baselines
+- Do not introduce privileged cleanup steps unless there is a real need
 
-## 10. Recommended Next Step For A New Agent
+## 9. Recommended Next Step For A New Agent
 
-Recommended next move: freeze the current v0.4 progress before expanding scope again.
+Two safe next-step options:
 
-Suggested steps:
-1. inspect `git diff`
-2. re-run full tests
-3. commit the v0.4.1 / v0.4.2 / v0.4.3 / v0.4.4 / v0.4.5 work
-4. optionally create a new checkpoint tag or freeze note
-5. only then continue with the next v0.4 round
+1. Verify the `b-v0.4-baseline` tag and use it as the stable resume point
+2. Start a narrow-scope `v0.5.1` on top of this baseline, focused on a minimal `workflow_profile` / `mission_profile` layer
 
-## 11. Minimal Resume Commands
+Do not reopen `v0.4` by expanding scope sideways before one of those two choices is explicit.
+
+## 10. Minimal Resume Commands
 
 ```bash
 git status --short
 git log --oneline --decorate -n 5
+git tag --list
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-For focused verification of the current uncommitted v0.4 work:
+Focused verification:
 
 ```bash
 python -m unittest tests.test_learning_journal_quality_control
@@ -302,16 +309,18 @@ python -m unittest tests.test_realm_evaluator
 python -m unittest tests.test_runtime_evaluation_integration
 ```
 
-## 12. Short Human Summary
+## 11. Short Human Summary
 
-The project is stable through `v0.3` and frozen at tag `b-v0.3-baseline`.
-The current working tree already contains five additional `v0.4` slices that are implemented and green:
+`v0.4` is no longer a working-tree-only state.
+It is committed, frozen, and resume-safe.
+
+The frozen `v0.4` baseline includes five completed slices:
 - journal quality control
 - baseline comparison
 - finer block-level context selection
 - evaluator input unification
-- runtime evaluation integration
+- runtime wiring for bundle / compare / evaluator
 
-Nothing in the current state suggests a broken main path.
-The biggest practical handoff fact is still this:
-`v0.4` progress exists, passes tests, but has not been committed yet.
+The main path remains stable and conservative.
+The most important practical fact for a new agent is this:
+start from the `b-v0.4-baseline` tag, keep the existing boundaries intact, and only then open a narrow `v0.5.1` scope.

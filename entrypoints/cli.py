@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import json
@@ -6,9 +6,11 @@ from pathlib import Path
 import sys
 from typing import Any
 
+from entrypoints.batch_runner import load_batch_request_file, run_batch_request
 from entrypoints.settings import load_settings
-from entrypoints.task_runner import SurfaceTaskRequest, run_task_request
+from entrypoints.task_runner import SurfaceTaskRequest, run_task_request, surface_result_succeeded
 from runtime.executor import Executor
+
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -18,19 +20,28 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "run":
-            task_text = _resolve_task_text(args)
-            result = run_command(
-                task_text,
-                settings,
-                task_type=args.task_type,
-                workflow_profile_id=args.workflow_profile_id,
-                workflow_profile=args.workflow_profile,
-                mission_profile_id=args.mission_profile_id,
-                success_criteria=list(args.success_criteria or []),
-                expected_artifacts=list(args.expected_artifacts or []),
-            )
+            if args.batch_file:
+                _validate_batch_run_args(args)
+                result = run_batch_command(
+                    args.batch_file,
+                    settings,
+                    batch_name=args.batch_name,
+                    stop_on_error=True if args.stop_on_error else None,
+                )
+            else:
+                task_text = _resolve_task_text(args)
+                result = run_command(
+                    task_text,
+                    settings,
+                    task_type=args.task_type,
+                    workflow_profile_id=args.workflow_profile_id,
+                    workflow_profile=args.workflow_profile,
+                    mission_profile_id=args.mission_profile_id,
+                    success_criteria=list(args.success_criteria or []),
+                    expected_artifacts=list(args.expected_artifacts or []),
+                )
             _print_json(result)
-            return 0 if _run_succeeded(result) else 1
+            return 0 if _result_succeeded(args, result) else 1
 
         if args.command == "inspect-state":
             _print_json(inspect_state_command(settings))
@@ -70,6 +81,22 @@ def run_command(
         expected_artifacts=list(expected_artifacts or []),
     )
     return run_task_request(request, settings, executor=Executor())
+
+
+
+def run_batch_command(
+    batch_file: str,
+    settings,
+    *,
+    batch_name: str | None = None,
+    stop_on_error: bool | None = None,
+) -> dict[str, Any]:
+    request = load_batch_request_file(
+        batch_file,
+        batch_name=batch_name,
+        stop_on_error=stop_on_error,
+    )
+    return run_batch_request(request, settings)
 
 
 
@@ -120,6 +147,14 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run", help="Run a single task through the minimal surface")
     run_parser.add_argument("task_parts", nargs="*", help="Task description to run")
     run_parser.add_argument("--task", dest="task_text", help="Task description to run")
+    run_parser.add_argument("--batch-file", dest="batch_file", help="Path to a batch json/jsonl request file")
+    run_parser.add_argument("--batch-name", dest="batch_name", help="Optional batch name override")
+    run_parser.add_argument(
+        "--stop-on-error",
+        dest="stop_on_error",
+        action="store_true",
+        help="Stop a batch after the first failed task",
+    )
     run_parser.add_argument("--task-type", dest="task_type", help="Optional task type override")
     run_parser.add_argument("--workflow-profile-id", dest="workflow_profile_id", help="Canonical workflow profile id")
     run_parser.add_argument("--workflow-profile", dest="workflow_profile", help="Workflow profile alias")
@@ -165,10 +200,29 @@ def _print_json(payload: dict[str, Any]) -> None:
 
 
 
-def _run_succeeded(result: dict[str, Any]) -> bool:
-    execution_ok = result["execution_result"]["status"] == "success"
-    verification_ok = result["verification_report"]["passed"]
-    return execution_ok and verification_ok
+def _result_succeeded(args, result: dict[str, Any]) -> bool:
+    if getattr(args, "batch_file", None):
+        return int(result.get("failed_tasks", 0) or 0) == 0
+    return surface_result_succeeded(result)
+
+
+
+def _validate_batch_run_args(args) -> None:
+    if getattr(args, "task_text", None):
+        raise ValueError("--batch-file cannot be combined with --task")
+    if getattr(args, "task_parts", None):
+        raise ValueError("--batch-file cannot be combined with positional task text")
+    for field_name in (
+        "task_type",
+        "workflow_profile_id",
+        "workflow_profile",
+        "mission_profile_id",
+        "success_criteria",
+        "expected_artifacts",
+    ):
+        value = getattr(args, field_name, None)
+        if value:
+            raise ValueError(f"--batch-file cannot be combined with --{field_name.replace('_', '-')}")
 
 
 if __name__ == "__main__":

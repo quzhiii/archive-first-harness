@@ -1,4 +1,4 @@
-﻿# AI Agent Runtime Harness
+# AI Agent Runtime Harness
 
 This repository contains a staged implementation skeleton for an AI agent runtime harness.
 It remains intentionally narrow: the main path is runnable, inspectable, and easy to compare across versions.
@@ -7,7 +7,7 @@ It is not a full agent platform.
 ## Current Stable Slice
 
 The frozen baseline is still `B v0.4` via `b-v0.4-baseline`.
-On top of that baseline, the current stable recovery slice is a narrow `v0.5.x` layer focused on profile semantics and minimal external surface handling.
+On top of that baseline, the current stable recovery slice is a narrow `v0.5.x` layer focused on profile semantics plus a minimal single-task and batch-capable external surface.
 
 The current `v0.5.x` slice adds:
 
@@ -16,21 +16,29 @@ The current `v0.5.x` slice adds:
 - shared profile-aware interpretation metadata for `BaselineComparator` and `RealmEvaluator`
 - `profile_input_adapter` with fixed precedence and fallback rules
 - `SurfaceTaskRequest` and `run_task_request(...)` as a thin external request surface
-- a thin CLI surface that forwards profile-aware input through the same normalization path
+- `SurfaceBatchRequest`, `run_batch_request(...)`, and `load_batch_request_file(...)` as a thin sequential batch surface
+- a thin CLI surface that forwards both single-task and batch input through the same normalization path
+- a minimal batch failure policy:
+  - `stop_on_error=False` continues after failures
+  - `stop_on_error=True` stops after the first failed task
 
-This is still a conservative runtime harness. It does not implement HTTP serving, async workers, batch orchestration, auto-execution governance, or rich memory systems.
+This is still a conservative runtime harness. It does not implement HTTP serving, async workers, queue orchestration, auto-execution governance, or rich memory systems.
 
 ## Current Runtime Chain
 
-The current execution and evaluation chain is:
+The current execution and evaluation chain is still single-path inside the runtime:
 
 `surface request / CLI -> profile_input_adapter -> task contract -> state manager -> context engine -> execution -> verification -> residual follow-up -> governance -> conditional sandbox -> rollback when needed -> journal append -> telemetry/metrics -> evaluation input bundle -> baseline compare / realm evaluator`
 
-The chain remains deliberately single-path and advisory-only.
+The current batch path is only a thin outer loop:
+
+`batch request / --batch-file -> SurfaceBatchRequest -> run_batch_request(...) -> repeated run_task_request(...)`
+
+The chain remains deliberately advisory-only.
 
 ## Current Directory Shape
 
-- `entrypoints/`: thin CLI, settings loader, and minimal task runner surface
+- `entrypoints/`: thin CLI, settings loader, single-task runner, and minimal batch runner surface
 - `planner/`: task contract builder and interviewer
 - `runtime/`: orchestrator, executor, verifier, model router, methodology router
 - `harness/contracts/`: workflow profiles and profile input normalization
@@ -42,12 +50,13 @@ The chain remains deliberately single-path and advisory-only.
 - `harness/sandbox/`: stub isolation and rollback abstractions
 - `harness/telemetry/`: local tracing and metrics aggregation
 - `harness/evaluation/`: baseline compare, evaluator input bundle, profile interpretation, realm evaluator
-- `tests/`: focused unit, smoke, and integration tests
+- `tests/`: focused unit, smoke, integration, and batch surface tests
 
 ## Freeze Status
 
 - Base baseline tag: `b-v0.4-baseline`
-- Current stable `v0.5.x` closeout tag: `b-v0.5-profile-surface`
+- Intermediate `v0.5.x` profile-aware surface tag: `b-v0.5-profile-surface`
+- Current stable `v0.5.x` batch surface closeout tag: `b-v0.5-batch-surface`
 - Base baseline closeout commit: `d03be5565642ce385cf529d9eb65ddb199d32215`
 - Expected full-suite verification command:
 
@@ -55,10 +64,10 @@ The chain remains deliberately single-path and advisory-only.
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-- Expected current result at closeout: `Ran 198 tests`, `OK`
+- Expected current result at closeout: `Ran 205 tests`, `OK`
 
 `v0.5.x` does not replace the meaning of the frozen `v0.4` baseline.
-It is a narrow profile-aware extension layer on top of that baseline.
+It is a narrow profile-aware and automation-friendly surface layer on top of that baseline.
 
 ## Running The Minimal CLI
 
@@ -68,10 +77,22 @@ Basic single-task execution:
 python -m entrypoints.cli run --task "Search docs for runtime context"
 ```
 
-Profile-aware execution through the thin surface:
+Profile-aware execution through the thin single-task surface:
 
 ```bash
 python -m entrypoints.cli run --task "Review runtime regression output" --task-type review --workflow-profile "evaluation regression"
+```
+
+Sequential batch execution from a JSON or JSONL file:
+
+```bash
+python -m entrypoints.cli run --batch-file tasks.json
+```
+
+Sequential batch execution that stops on the first failed task:
+
+```bash
+python -m entrypoints.cli run --batch-file tasks.json --stop-on-error
 ```
 
 Inspect persisted state summary:
@@ -88,8 +109,14 @@ python -m entrypoints.cli inspect-contract
 
 ## Programmatic Surface
 
-The minimal function-level surface is `run_task_request(...)`.
-It accepts `SurfaceTaskRequest` and uses the same profile normalization path as the CLI.
+The minimal function-level surfaces are:
+
+- `run_task_request(...)` for a single `SurfaceTaskRequest`
+- `run_batch_request(...)` for a sequential `SurfaceBatchRequest`
+- `load_batch_request_file(...)` for `.json` and `.jsonl` batch request files
+
+Both surfaces use the same profile normalization path.
+The batch layer is only an outer aggregator and does not rewrite the underlying runtime/evaluation schema.
 It is intended for tests, automation, and future entry surfaces.
 It is not an HTTP server.
 
@@ -113,14 +140,16 @@ Baseline collection rule:
 - future baseline diffs should enumerate these JSON files directly or glob only top-level `*.json`
 
 `v0.5.x` does not introduce a new frozen baseline artifact pack.
-It keeps the explicit `v0.3` comparison pack and adds profile-aware interpretation and surface handling on top of the existing runtime outputs.
+It keeps the explicit `v0.3` comparison pack and adds profile-aware interpretation plus minimal single-task and batch surface handling on top of the existing runtime outputs.
 
 ## What The Current System Explicitly Does Not Do
 
 The current version still does not implement:
 
 - HTTP server / FastAPI shell
-- batch runner or automation queue
+- queue / scheduler / async worker infrastructure
+- batch-driven adaptive replanning or cross-task mutation
+- artifacts export or report rendering
 - parallel worker pools or subagent runtime
 - database-backed state
 - async event bus / queue infrastructure
@@ -134,5 +163,12 @@ The current version still does not implement:
 
 ## Suggested Next Direction
 
-The next narrow, compatible extension is a `batch / automation-friendly surface` on top of the current function-level runner.
-That is a smaller and safer step than adding an HTTP server shell immediately.
+The next narrow, compatible extension is `automation artifacts / batch report export`.
+
+Reason:
+
+- the batch surface is now stable and sequential
+- export/reporting extends the outer surface without expanding runtime control semantics
+- it is a smaller and safer step than adding an HTTP server shell immediately
+
+A minimal HTTP/API server shell is now feasible, but it is still the larger next step and should stay out of this checkpoint.

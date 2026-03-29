@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass
@@ -56,6 +56,7 @@ class SurfaceTaskRequest:
             "mission_profile_id": self.mission_profile_id,
             "task_type": self.task_type,
         }
+
 
 
 def run_task_request(
@@ -122,6 +123,19 @@ def run_task_request(
     output.setdefault("telemetry", output.get("metrics_summary"))
     output.setdefault("evaluation", output.get("realm_evaluation"))
     return output
+
+
+
+def surface_result_succeeded(result: Mapping[str, Any]) -> bool:
+    execution_result = result.get("execution_result")
+    verification_report = result.get("verification_report")
+    if not isinstance(execution_result, Mapping):
+        return False
+    if not isinstance(verification_report, Mapping):
+        return False
+    execution_ok = str(execution_result.get("status") or "") == "success"
+    verification_ok = bool(verification_report.get("passed"))
+    return execution_ok and verification_ok
 
 
 

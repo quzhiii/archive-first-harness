@@ -66,6 +66,7 @@ class TaskContract:
     escalation_policy: list[str] = field(default_factory=list)
     methodology_family: str = "general"
     failure_escalation_policy: list[str] = field(default_factory=list)
+    workflow_profile_id: str = "default_general"
 
     def __post_init__(self) -> None:
         self.contract_id = self.contract_id.strip()
@@ -81,6 +82,7 @@ class TaskContract:
             self.failure_escalation_policy
         )
         self.methodology_family = self.methodology_family.strip()
+        self.workflow_profile_id = self.workflow_profile_id.strip()
         self.schema_version = self.schema_version.strip()
 
         if not self.contract_id:
@@ -101,6 +103,8 @@ class TaskContract:
             raise ValueError("expected_artifacts must not be empty")
         if not self.methodology_family:
             raise ValueError("methodology_family must not be empty")
+        if not self.workflow_profile_id:
+            raise ValueError("workflow_profile_id must not be empty")
 
 
 @dataclass(slots=True)
@@ -195,3 +199,4 @@ class WorkingContext:
         self.active_skills = _clean_string_list(self.active_skills)
         self.tool_signatures = _clean_string_list(self.tool_signatures)
         self.retrieval_packets = _clean_string_list(self.retrieval_packets)
+

@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Any
 import re
 
+from harness.contracts.workflow_profile import WorkflowProfile, resolve_workflow_profile
 from harness.state.models import TaskContract, TaskBlock, WorkingContext
 from harness.state.state_manager import StateSnapshot
 
@@ -38,6 +39,8 @@ class ContextEngine:
     MAX_TOOL_RESULTS = 3
     MAX_JOURNAL_LESSONS = 2
     MAX_RESIDUAL_PACKETS = 1
+    PROFILE_BLOCK_PRIORITY_BONUS = 0.25
+    PROFILE_NOTE_BONUS = 2
 
     def build_working_context(
         self,
@@ -79,12 +82,25 @@ class ContextEngine:
         distilled_summary: str | None = None,
         journal_lessons: list[object] | None = None,
     ) -> dict[str, Any]:
+        profile = self._resolve_workflow_profile(task_contract)
+        block_priorities = self._build_block_priorities(profile)
         task_block_notes = self._build_task_block_notes(state_snapshot.task_block)
         summary_notes = self._build_summary_notes(distilled_summary)
         residual_notes = self._build_residual_notes(state_snapshot.task_block)
-        project_notes = self._build_project_notes(task_contract, state_snapshot)
-        global_notes = self._build_global_notes(task_contract, state_snapshot)
-        journal_packets, journal_meta = self._build_journal_packets(journal_lessons or [])
+        project_notes = self._build_project_notes(
+            task_contract,
+            state_snapshot,
+            profile=profile,
+        )
+        global_notes = self._build_global_notes(
+            task_contract,
+            state_snapshot,
+            profile=profile,
+        )
+        journal_packets, journal_meta = self._build_journal_packets(
+            journal_lessons or [],
+            profile=profile,
+        )
 
         blocks = {
             "task_contract": self._make_block(
@@ -94,6 +110,7 @@ class ContextEngine:
                 included=True,
                 reason="contract_boundary_always_included",
                 max_items=1,
+                priority=block_priorities["task_contract"],
             ),
             "task_block": self._make_block(
                 "task_block",
@@ -106,6 +123,7 @@ class ContextEngine:
                     else "task_block_empty"
                 ),
                 max_items=self.MAX_TASK_BLOCK_NOTES,
+                priority=block_priorities["task_block"],
             ),
             "distilled_summary": self._make_block(
                 "distilled_summary",
@@ -118,6 +136,7 @@ class ContextEngine:
                     else "no_distilled_summary"
                 ),
                 max_items=self.MAX_SUMMARY_NOTES,
+                priority=block_priorities["distilled_summary"],
             ),
             "residual_state": self._make_block(
                 "residual_state",
@@ -130,6 +149,7 @@ class ContextEngine:
                     else "residual_state_not_actionable"
                 ),
                 max_items=self.MAX_RESIDUAL_PACKETS,
+                priority=block_priorities["residual_state"],
             ),
             "project_block": self._make_block(
                 "project_block",
@@ -142,6 +162,7 @@ class ContextEngine:
                     else "no_relevant_project_context"
                 ),
                 max_items=self.MAX_PROJECT_NOTES,
+                priority=block_priorities["project_block"],
             ),
             "global_state": self._make_block(
                 "global_state",
@@ -154,6 +175,7 @@ class ContextEngine:
                     else "no_relevant_global_state"
                 ),
                 max_items=self.MAX_GLOBAL_NOTES,
+                priority=block_priorities["global_state"],
             ),
             "journal_lessons_active": self._make_block(
                 "journal_lessons_active",
@@ -162,6 +184,7 @@ class ContextEngine:
                 included=bool(journal_packets),
                 reason=self._journal_reason(journal_packets, journal_meta),
                 max_items=self.MAX_JOURNAL_LESSONS,
+                priority=block_priorities["journal_lessons_active"],
             ),
         }
         return {
@@ -169,10 +192,11 @@ class ContextEngine:
             "selection_order": [
                 name
                 for name, _ in sorted(
-                    self.BLOCK_PRIORITY.items(),
-                    key=lambda item: item[1],
+                    block_priorities.items(),
+                    key=lambda item: (item[1], self.BLOCK_PRIORITY[item[0]]),
                 )
             ],
+            "workflow_profile_id": profile.profile_id,
         }
 
     def prune_context_blocks(self, selection: Mapping[str, Any]) -> dict[str, list[str]]:
@@ -206,6 +230,7 @@ class ContextEngine:
             journal_lessons=journal_lessons,
         )
         report = {
+            "workflow_profile_id": selection.get("workflow_profile_id", "default_general"),
             "included_blocks": [],
             "excluded_blocks": [],
             "block_order": list(selection["selection_order"]),
@@ -274,6 +299,7 @@ class ContextEngine:
         included: bool,
         reason: str,
         max_items: int,
+        priority: float,
     ) -> dict[str, object]:
         if isinstance(content, list):
             item_count = len(content)
@@ -282,7 +308,7 @@ class ContextEngine:
         else:
             item_count = 1
         return {
-            "priority": self.BLOCK_PRIORITY[block_name],
+            "priority": priority,
             "usage": usage,
             "content": content,
             "included": included,
@@ -290,6 +316,59 @@ class ContextEngine:
             "max_items": max_items,
             "item_count": item_count,
         }
+
+    def _resolve_workflow_profile(self, task_contract: TaskContract) -> WorkflowProfile:
+        return resolve_workflow_profile(
+            getattr(task_contract, "workflow_profile_id", None),
+            task_type=getattr(task_contract, "task_type", None),
+        )
+
+    def _build_block_priorities(self, profile: WorkflowProfile) -> dict[str, float]:
+        priorities = {
+            name: float(priority)
+            for name, priority in self.BLOCK_PRIORITY.items()
+        }
+        for index, block_name in enumerate(profile.context_bias):
+            if block_name not in priorities or block_name == "task_contract":
+                continue
+            bonus = max(self.PROFILE_BLOCK_PRIORITY_BONUS - (index * 0.05), 0.05)
+            priorities[block_name] = max(0.0, priorities[block_name] - bonus)
+        return priorities
+
+    def _profile_terms(self, profile: WorkflowProfile) -> set[str]:
+        terms: set[str] = set()
+        for item in list(profile.success_focus) + list(profile.artifact_expectation) + [profile.intent_class]:
+            terms.update(self._tokenize(item))
+        return terms
+
+    def _profile_note_bonus(self, text: str, profile: WorkflowProfile) -> int:
+        profile_terms = self._profile_terms(profile)
+        if not profile_terms:
+            return 0
+        text_terms = set(self._tokenize(text))
+        return min(len(text_terms & profile_terms), self.PROFILE_NOTE_BONUS)
+
+    def _journal_profile_score(
+        self,
+        item: object,
+        normalized_packet: str,
+        *,
+        profile: WorkflowProfile,
+    ) -> int:
+        profile_terms = self._profile_terms(profile)
+        if not profile_terms:
+            return 0
+
+        haystack_terms = set(self._tokenize(normalized_packet))
+        if isinstance(item, dict):
+            haystack_terms.update(self._tokenize(str(item.get("source") or "")))
+            tags = item.get("tags")
+            if isinstance(tags, str):
+                haystack_terms.update(self._tokenize(tags))
+            elif isinstance(tags, (list, tuple)):
+                for tag in tags:
+                    haystack_terms.update(self._tokenize(str(tag)))
+        return len(haystack_terms & profile_terms)
 
     def _build_task_block_notes(self, task_block: TaskBlock) -> list[str]:
         notes: list[str] = [f"Task goal: {task_block.current_goal}"]
@@ -341,6 +420,8 @@ class ContextEngine:
         self,
         task_contract: TaskContract,
         state_snapshot: StateSnapshot,
+        *,
+        profile: WorkflowProfile,
     ) -> list[str]:
         query_terms = self._query_terms(task_contract, state_snapshot.task_block)
         candidates: list[tuple[str, bool]] = []
@@ -370,12 +451,15 @@ class ContextEngine:
             candidates,
             query_terms=query_terms,
             limit=self.MAX_PROJECT_NOTES,
+            profile=profile,
         )
 
     def _build_global_notes(
         self,
         task_contract: TaskContract,
         state_snapshot: StateSnapshot,
+        *,
+        profile: WorkflowProfile,
     ) -> list[str]:
         query_terms = self._query_terms(task_contract, state_snapshot.task_block)
         candidates: list[tuple[str, bool]] = []
@@ -400,15 +484,20 @@ class ContextEngine:
             candidates,
             query_terms=query_terms,
             limit=self.MAX_GLOBAL_NOTES,
+            profile=profile,
         )
 
-    def _build_journal_packets(self, journal_lessons: list[object]) -> tuple[list[str], dict[str, int]]:
-        packets: list[str] = []
-        seen: set[str] = set()
+    def _build_journal_packets(
+        self,
+        journal_lessons: list[object],
+        *,
+        profile: WorkflowProfile,
+    ) -> tuple[list[str], dict[str, int]]:
+        candidates: list[tuple[int, int, str]] = []
         archived_skipped = 0
         invalid_skipped = 0
 
-        for lesson in journal_lessons:
+        for index, lesson in enumerate(journal_lessons):
             normalized = self._normalize_journal_lesson(lesson)
             if normalized is None:
                 if isinstance(lesson, dict) and str(lesson.get("archive_status") or "").strip().lower() == "archived":
@@ -416,6 +505,16 @@ class ContextEngine:
                 else:
                     invalid_skipped += 1
                 continue
+            candidates.append((
+                self._journal_profile_score(lesson, normalized, profile=profile),
+                index,
+                normalized,
+            ))
+
+        candidates.sort(key=lambda item: (-item[0], item[1], item[2]))
+        packets: list[str] = []
+        seen: set[str] = set()
+        for _, _, normalized in candidates:
             if normalized in seen:
                 continue
             packets.append(normalized)
@@ -443,6 +542,7 @@ class ContextEngine:
         *,
         query_terms: set[str],
         limit: int,
+        profile: WorkflowProfile,
     ) -> list[str]:
         always_include: list[str] = []
         relevant: list[tuple[int, str]] = []
@@ -456,7 +556,7 @@ class ContextEngine:
 
             score = self._relevance_score(normalized_note, query_terms)
             if score > 0:
-                relevant.append((score, normalized_note))
+                relevant.append((score + self._profile_note_bonus(normalized_note, profile), normalized_note))
             elif include_without_overlap:
                 always_include.append(normalized_note)
 

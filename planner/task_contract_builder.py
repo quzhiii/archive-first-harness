@@ -1,8 +1,9 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from uuid import uuid4
 
+from harness.contracts.profile_input_adapter import resolve_surface_workflow_profile
 from harness.state.models import (
     BudgetLevel,
     RiskLevel,
@@ -185,6 +186,7 @@ class TaskContractBuilder:
             escalation_policy=self._resolve_escalation_policy(task_type, options),
             methodology_family=self._resolve_methodology_family(task_type, options),
             failure_escalation_policy=self._resolve_failure_policy(task_type, options),
+            workflow_profile_id=self._resolve_workflow_profile_id(task_type, options),
             stop_conditions=self._resolve_stop_conditions(task_type, options),
         )
 
@@ -387,6 +389,14 @@ class TaskContractBuilder:
             "fall back to clarification before widening scope",
         ]
 
+    def _resolve_workflow_profile_id(
+        self,
+        task_type: TaskType,
+        options: Mapping[str, object],
+    ) -> str:
+        resolution = resolve_surface_workflow_profile(options, task_type=task_type)
+        return resolution.workflow_profile_id
+
     def _resolve_stop_conditions(
         self,
         task_type: TaskType,
@@ -400,3 +410,5 @@ class TaskContractBuilder:
             "the required action exceeds the allowed permission level",
             "the available budget is exhausted before the result can be validated",
         ]
+
+

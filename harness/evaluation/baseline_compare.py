@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 import json
 
+from harness.evaluation.profile_interpretation import build_profile_interpretation
+
 
 class BaselineComparator:
     """Compare a current artifact against a single baseline JSON artifact.
@@ -82,8 +84,17 @@ class BaselineComparator:
         baseline: Mapping[str, Any] | Sequence[Any],
         *,
         artifact_type: str,
+        task_contract_summary: Mapping[str, Any] | None = None,
+        workflow_profile_id: str | None = None,
+        task_type: str | None = None,
     ) -> dict[str, Any]:
         normalized_artifact_type = self._normalize_artifact_type(artifact_type)
+        profile_metadata = self._build_profile_metadata(
+            artifact_type=normalized_artifact_type,
+            task_contract_summary=task_contract_summary,
+            workflow_profile_id=workflow_profile_id,
+            task_type=task_type,
+        )
         required_fields = self._required_top_level_fields(normalized_artifact_type)
 
         missing_fields: list[str] = []
@@ -111,6 +122,7 @@ class BaselineComparator:
                 type_mismatches=type_mismatches,
                 value_drifts=value_drifts,
                 reason_codes=reason_codes,
+                metadata=profile_metadata,
             )
             result["summary"] = self.summarize_diff(result)
             return result
@@ -133,6 +145,7 @@ class BaselineComparator:
                 type_mismatches=type_mismatches,
                 value_drifts=value_drifts,
                 reason_codes=reason_codes,
+                metadata=profile_metadata,
             )
             result["summary"] = self.summarize_diff(result)
             return result
@@ -181,6 +194,7 @@ class BaselineComparator:
             type_mismatches=type_mismatches,
             value_drifts=value_drifts,
             reason_codes=reason_codes,
+            metadata=profile_metadata,
         )
         result["summary"] = self.summarize_diff(result)
         return result
@@ -196,17 +210,28 @@ class BaselineComparator:
 
         artifacts = to_baseline_artifacts(bundle)
         normalized_artifact_type = self._normalize_artifact_type(artifact_type)
+        task_contract_summary = self._extract_task_contract_summary(bundle)
         return self.compare(
             current=artifacts[normalized_artifact_type],
             baseline=baseline,
             artifact_type=normalized_artifact_type,
+            task_contract_summary=task_contract_summary,
         )
 
     def summarize_diff(self, diff_result: Mapping[str, Any]) -> str:
         artifact_type = str(diff_result.get("artifact_type") or "artifact")
         status = str(diff_result.get("status") or "warning")
+        metadata = diff_result.get("metadata") if isinstance(diff_result.get("metadata"), Mapping) else {}
+        profile_id = str(metadata.get("workflow_profile_id") or "default_general")
+        comparison_focus = [str(item) for item in metadata.get("comparison_focus", []) if str(item)]
+        artifact_relevance_hint = str(metadata.get("artifact_relevance_hint") or "general")
+        focus_text = ", ".join(comparison_focus[:2]) if comparison_focus else "general stability"
+
         if status == "compatible":
-            return f"{artifact_type} is compatible with the baseline."
+            return (
+                f"{artifact_type} is compatible for profile {profile_id} "
+                f"with {artifact_relevance_hint} relevance and focus on {focus_text}."
+            )
 
         segments: list[str] = []
         missing_fields = list(diff_result.get("missing_fields", []))
@@ -231,7 +256,10 @@ class BaselineComparator:
             segments.append(f"value drift at {drift['field']}: {drift['detail']}")
 
         detail = "; ".join(segments) if segments else "drift detected without a more specific detail"
-        return f"{artifact_type} is {status}: {detail}."
+        return (
+            f"{artifact_type} is {status} for profile {profile_id} "
+            f"with {artifact_relevance_hint} relevance and focus on {focus_text}: {detail}."
+        )
 
     def is_structurally_compatible(
         self,
@@ -242,6 +270,36 @@ class BaselineComparator:
     ) -> bool:
         diff_result = self.compare(current, baseline, artifact_type=artifact_type)
         return not diff_result["missing_fields"] and not diff_result["type_mismatches"]
+
+    def _build_profile_metadata(
+        self,
+        *,
+        artifact_type: str,
+        task_contract_summary: Mapping[str, Any] | None = None,
+        workflow_profile_id: str | None = None,
+        task_type: str | None = None,
+    ) -> dict[str, Any]:
+        summary = task_contract_summary if isinstance(task_contract_summary, Mapping) else {}
+        interpretation = build_profile_interpretation(
+            workflow_profile_id or summary.get("workflow_profile_id"),
+            task_type=task_type or str(summary.get("task_type") or ""),
+            artifact_type=artifact_type,
+        )
+        return {
+            "workflow_profile_id": interpretation.workflow_profile_id,
+            "profile_name": interpretation.profile_name,
+            "intent_class": interpretation.intent_class,
+            "comparison_focus": list(interpretation.comparison_focus),
+            "artifact_relevance_hint": interpretation.artifact_relevance_hint,
+            "metadata_tags": list(interpretation.metadata_tags),
+        }
+
+    def _extract_task_contract_summary(self, bundle: object) -> Mapping[str, Any] | None:
+        if isinstance(bundle, Mapping):
+            task_summary = bundle.get("task_contract_summary")
+            return task_summary if isinstance(task_summary, Mapping) else None
+        task_summary = getattr(bundle, "task_contract_summary", None)
+        return task_summary if isinstance(task_summary, Mapping) else None
 
     def _artifact_specific_diff(
         self,
@@ -744,6 +802,7 @@ class BaselineComparator:
         type_mismatches: list[dict[str, str]],
         value_drifts: list[dict[str, Any]],
         reason_codes: list[str],
+        metadata: Mapping[str, Any],
     ) -> dict[str, Any]:
         return {
             "artifact_type": artifact_type,
@@ -754,6 +813,7 @@ class BaselineComparator:
             "value_drifts": value_drifts,
             "summary": "",
             "reason_codes": reason_codes,
+            "metadata": dict(metadata),
         }
 
     def _escalate(self, current: str, candidate: str) -> str:

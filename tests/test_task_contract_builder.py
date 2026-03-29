@@ -1,5 +1,7 @@
 import unittest
+from unittest.mock import patch
 
+from harness.contracts.profile_input_adapter import ProfileInputResolution
 from harness.state.models import (
     BudgetLevel,
     RiskLevel,
@@ -76,6 +78,35 @@ class TaskContractBuilderTests(unittest.TestCase):
         self.assertEqual(contract.escalation_budget, BudgetLevel.LOW)
         self.assertEqual(contract.expected_artifacts, ["answer"])
         self.assertEqual(contract.stop_conditions, ["No matching note is available."])
+
+    def test_builder_uses_shared_profile_input_adapter(self) -> None:
+        with patch("planner.task_contract_builder.resolve_surface_workflow_profile") as resolve_mock:
+            resolve_mock.return_value = ProfileInputResolution(
+                workflow_profile_id="planning_design",
+                source="workflow_profile",
+                used_fallback=False,
+                fallback_reason=None,
+            )
+
+            contract = self.builder.build(
+                "Design a runtime harness plan.",
+                constraints={"workflow_profile": "planning-design"},
+            )
+
+        resolve_mock.assert_called_once()
+        _, kwargs = resolve_mock.call_args
+        self.assertEqual(kwargs["task_type"], TaskType.PLANNING)
+        self.assertEqual(contract.workflow_profile_id, "planning_design")
+
+    def test_builder_keeps_only_normalized_workflow_profile_id(self) -> None:
+        contract = self.builder.build(
+            "Implement a runtime harness patch.",
+            constraints={"mission_profile_id": "Implementation-Build"},
+        )
+
+        self.assertEqual(contract.workflow_profile_id, "implementation_build")
+        self.assertFalse(hasattr(contract, "workflow_profile"))
+        self.assertFalse(hasattr(contract, "mission_profile_id"))
 
 
 if __name__ == "__main__":

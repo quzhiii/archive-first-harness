@@ -83,6 +83,22 @@ class RealmEvaluatorTests(unittest.TestCase):
         self.assertEqual(result["metadata"]["automatic_action"], "none")
         self.assertTrue(result["requires_human_review"])
 
+    def test_unknown_profile_falls_back_without_changing_action_semantics(self) -> None:
+        result = self.evaluator.evaluate(
+            {
+                "workflow_profile_id": "unknown_profile",
+                "task_type": "review",
+                "metrics": {
+                    "retry_count": {"last": 1},
+                    "skill_hit_rate": {"last": 1},
+                },
+            }
+        )
+
+        self.assertEqual(result["recommendation"], "observe")
+        self.assertEqual(result["metadata"]["workflow_profile_id"], "default_general")
+        self.assertEqual(result["metadata"]["automatic_action"], "none")
+
     def test_output_shape_is_complete(self) -> None:
         result = self.evaluator.evaluate({"metrics": {}})
 

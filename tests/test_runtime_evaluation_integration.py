@@ -55,6 +55,7 @@ def make_contract(
     allowed_tools: list[str],
     methodology_family: str,
     failure_escalation_policy: list[str] | None = None,
+    workflow_profile_id: str = "default_general",
 ) -> TaskContract:
     return TaskContract(
         task_id=task_id,
@@ -72,6 +73,7 @@ def make_contract(
         residual_risk_level=residual_risk_level,
         methodology_family=methodology_family,
         failure_escalation_policy=failure_escalation_policy or [],
+        workflow_profile_id=workflow_profile_id,
     )
 
 
@@ -206,12 +208,14 @@ class RuntimeEvaluationIntegrationTests(unittest.TestCase):
                 residual_risk_level=RiskLevel.LOW,
                 allowed_tools=["search", "read_files"],
                 methodology_family="research",
+                workflow_profile_id="evaluation_regression",
             ),
             executor=Executor(),
             baseline_artifacts=baselines,
         )
 
         compare_results = result["baseline_compare_results"]
+        metrics_compare_metadata = compare_results["artifact_results"]["metrics_summary"]["metadata"]
         self.assertEqual(compare_results["status"], "completed")
         self.assertEqual(
             compare_results["artifact_results"]["verification_report"]["status"],
@@ -225,7 +229,40 @@ class RuntimeEvaluationIntegrationTests(unittest.TestCase):
             compare_results["artifact_results"]["metrics_summary"]["status"],
             {"compatible", "warning"},
         )
+        self.assertEqual(metrics_compare_metadata["workflow_profile_id"], "evaluation_regression")
+        self.assertEqual(
+            metrics_compare_metadata["comparison_focus"],
+            result["realm_evaluation"]["metadata"]["comparison_focus"],
+        )
+        self.assertEqual(
+            metrics_compare_metadata["artifact_relevance_hint"],
+            result["realm_evaluation"]["metadata"]["artifact_relevance_hint"],
+        )
         self.assertEqual(result["execution_result"]["status"], "success")
+
+    def test_real_run_keeps_profile_summary_without_new_control_branch(self) -> None:
+        result = run_runtime_flow(
+            base_dir=self.temp_dir / "profile_summary",
+            contract=make_contract(
+                task_id="task-runtime-eval-profile",
+                contract_id="contract-runtime-eval-profile",
+                task_type=TaskType.REVIEW,
+                write_permission_level=WritePermissionLevel.READ,
+                residual_risk_level=RiskLevel.LOW,
+                allowed_tools=["read_files"],
+                methodology_family="compliance",
+                workflow_profile_id="evaluation_regression",
+            ),
+            executor=Executor(),
+        )
+
+        task_summary = result["evaluation_input_bundle"]["task_contract_summary"]
+        self.assertEqual(task_summary["workflow_profile_id"], "evaluation_regression")
+        self.assertEqual(task_summary["intent_class"], "evaluation")
+        self.assertEqual(result["realm_evaluation"]["metadata"]["workflow_profile_id"], "evaluation_regression")
+        self.assertEqual(result["realm_evaluation"]["metadata"]["automatic_action"], "none")
+        self.assertIn(result["execution_result"]["status"], {"success", "error"})
+        self.assertFalse(result["sandbox_triggered"])
 
     def test_compare_and_realm_outputs_do_not_become_runtime_controllers(self) -> None:
         baselines = load_baseline_artifacts("success_verification_report.json")

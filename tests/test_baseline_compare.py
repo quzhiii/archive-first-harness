@@ -181,6 +181,44 @@ class BaselineComparatorTests(unittest.TestCase):
         self.assertIn("journal_payload_bloat_detected", diff_result["reason_codes"])
         self.assertIn("sandbox_result", diff_result["value_drifts"][0]["detail"])
 
+    def test_compare_result_is_profile_aware_without_changing_diff_logic(self) -> None:
+        current = json.loads(json.dumps(self.metrics_summary))
+        current["metrics"]["retry_count"]["last"] = 2
+
+        default_diff = self.comparator.compare(
+            current=current,
+            baseline=self.metrics_summary,
+            artifact_type="metrics_summary",
+        )
+        profiled_diff = self.comparator.compare(
+            current=current,
+            baseline=self.metrics_summary,
+            artifact_type="metrics_summary",
+            task_contract_summary={
+                "workflow_profile_id": "evaluation_regression",
+                "task_type": "review",
+            },
+        )
+
+        self.assertEqual(default_diff["status"], "warning")
+        self.assertEqual(profiled_diff["status"], "warning")
+        self.assertEqual(default_diff["reason_codes"], profiled_diff["reason_codes"])
+        self.assertEqual(profiled_diff["metadata"]["workflow_profile_id"], "evaluation_regression")
+        self.assertIn("baseline drift", profiled_diff["metadata"]["comparison_focus"])
+        self.assertIn("evaluation_regression", profiled_diff["summary"])
+
+    def test_unknown_profile_falls_back_to_default_general_for_compare_metadata(self) -> None:
+        diff_result = self.comparator.compare(
+            current=self.verification_report,
+            baseline=self.verification_report,
+            artifact_type="verification_report",
+            workflow_profile_id="unknown_profile",
+        )
+
+        self.assertEqual(diff_result["status"], "compatible")
+        self.assertEqual(diff_result["metadata"]["workflow_profile_id"], "default_general")
+        self.assertEqual(diff_result["metadata"]["intent_class"], "general")
+
     def test_human_readable_summary_is_clear(self) -> None:
         current = json.loads(json.dumps(self.metrics_summary))
         current["metrics"]["retry_count"]["last"] = 2

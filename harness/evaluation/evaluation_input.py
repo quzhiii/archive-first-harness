@@ -5,6 +5,8 @@ from dataclasses import asdict, dataclass, is_dataclass
 from enum import Enum
 from typing import Any
 
+from harness.contracts.workflow_profile import resolve_workflow_profile
+
 
 EVENT_TRACE_KEY_EVENTS = (
     "on_verification_report",
@@ -108,11 +110,16 @@ def summarize_task_contract(task_contract: object) -> dict[str, Any]:
     write_permission_level = _as_string(payload.get("write_permission_level"))
     residual_risk_level = _as_string(payload.get("residual_risk_level"))
     methodology_family = _as_string(payload.get("methodology_family"))
+    workflow_profile = resolve_workflow_profile(
+        _as_string(payload.get("workflow_profile_id")),
+        task_type=task_type,
+    )
 
     scenario_tags = [
         tag
         for tag in [
             task_type,
+            f"profile:{workflow_profile.profile_id}" if workflow_profile.profile_id else "",
             f"risk:{residual_risk_level}" if residual_risk_level else "",
             f"permission:{write_permission_level}" if write_permission_level else "",
             f"method:{methodology_family}" if methodology_family else "",
@@ -128,6 +135,9 @@ def summarize_task_contract(task_contract: object) -> dict[str, Any]:
         "success_criteria": success_criteria,
         "expected_artifacts": expected_artifacts,
         "stop_conditions": stop_conditions,
+        "workflow_profile_id": workflow_profile.profile_id,
+        "intent_class": workflow_profile.intent_class,
+        "success_focus": list(workflow_profile.success_focus[:3]),
         "scenario_tags": scenario_tags,
         "constraint_flags": {
             "has_stop_conditions": bool(stop_conditions),
@@ -356,14 +366,22 @@ def to_realm_evaluator_payload(
     bundle: EvaluationInputBundle | Mapping[str, Any],
 ) -> dict[str, Any]:
     normalized = _coerce_bundle(bundle)
+    task_summary = normalized.task_contract_summary
+    profile = resolve_workflow_profile(
+        _as_string(task_summary.get("workflow_profile_id")),
+        task_type=_as_string(task_summary.get("task_type")),
+    )
     metrics_summary = _deep_copy_optional_mapping(normalized.metrics_summary)
-    if metrics_summary is not None:
-        return metrics_summary
-    return {
+    payload = metrics_summary or {
         "event_count": 0,
         "metric_count": 0,
         "metrics": {},
     }
+    payload["workflow_profile_id"] = profile.profile_id
+    payload["task_type"] = _as_string(task_summary.get("task_type"))
+    payload["intent_class"] = _as_string(task_summary.get("intent_class")) or profile.intent_class
+    payload["success_focus"] = _normalize_string_list(task_summary.get("success_focus"), limit=3) or list(profile.success_focus[:2])
+    return payload
 
 
 def _coerce_bundle(bundle: EvaluationInputBundle | Mapping[str, Any]) -> EvaluationInputBundle:
@@ -584,3 +602,4 @@ def _confidence_value_from_bands(bands: Sequence[str]) -> float:
 
 def _as_string(value: object) -> str:
     return str(value).strip() if value is not None else ""
+

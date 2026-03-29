@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from harness.evaluation.profile_interpretation import ProfileInterpretation, build_profile_interpretation
 from harness.evaluation.evaluation_input import to_realm_evaluator_payload
 
 
@@ -12,8 +13,13 @@ class RealmEvaluator:
         return self.evaluate(to_realm_evaluator_payload(bundle))
 
     def evaluate(self, metrics_summary: dict[str, Any]) -> dict[str, Any]:
+        interpretation = build_profile_interpretation(
+            metrics_summary.get("workflow_profile_id"),
+            task_type=metrics_summary.get("task_type"),
+            artifact_type="metrics_summary",
+        )
         recommendation, reason_codes = self.build_recommendation(metrics_summary)
-        summary = self.explain_decision(recommendation, reason_codes)
+        summary = self.explain_decision(recommendation, reason_codes, interpretation)
         return {
             "status": "ok",
             "recommendation": recommendation,
@@ -24,6 +30,13 @@ class RealmEvaluator:
                 "automatic_action": "none",
                 "source": "v0.1 rule-based realm evaluator",
                 "metric_count": len(metrics_summary.get("metrics", {})),
+                "workflow_profile_id": interpretation.workflow_profile_id,
+                "profile_name": interpretation.profile_name,
+                "intent_class": interpretation.intent_class,
+                "interpretation_focus": list(interpretation.evaluation_focus),
+                "comparison_focus": list(interpretation.comparison_focus),
+                "artifact_relevance_hint": interpretation.artifact_relevance_hint,
+                "metadata_tags": list(interpretation.metadata_tags),
             },
         }
 
@@ -86,16 +99,24 @@ class RealmEvaluator:
             return "observe", reason_codes
         return "keep", ["stable_baseline"]
 
-    def explain_decision(self, recommendation: str, reason_codes: list[str]) -> str:
+    def explain_decision(
+        self,
+        recommendation: str,
+        reason_codes: list[str],
+        interpretation: ProfileInterpretation,
+    ) -> str:
+        focus_text = ", ".join(list(interpretation.evaluation_focus)[:2]) or "general stability"
+        prefix = f"{interpretation.profile_name} perspective ({focus_text}): "
         if recommendation == "keep":
-            return "Current signals are stable enough to keep the component in the v0.1 path."
+            return prefix + "Current signals are stable enough to keep the component in the v0.1 path."
         if recommendation == "observe":
             joined = ", ".join(reason_codes)
-            return f"Observed non-critical pressure signals: {joined}. Keep the component, but review it later."
+            return prefix + f"Observed non-critical pressure signals: {joined}. Keep the component, but review it later."
         joined = ", ".join(reason_codes)
         return (
-            f"The component is a retire candidate because repeated overhead signals were detected: {joined}. "
-            "This is advisory only and requires human review."
+            prefix
+            + f"The component is a retire candidate because repeated overhead signals were detected: {joined}. "
+            + "This is advisory only and requires human review."
         )
 
     def _metric_last(self, metrics_summary: dict[str, Any], metric_name: str) -> float:

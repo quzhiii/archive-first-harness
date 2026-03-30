@@ -1,11 +1,11 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
 from typing import Any
 
+from entrypoints.batch_export import BatchExportOptions, export_batch_results
 from entrypoints.batch_runner import load_batch_request_file, run_batch_request
 from entrypoints.settings import load_settings
 from entrypoints.task_runner import SurfaceTaskRequest, run_task_request, surface_result_succeeded
@@ -27,8 +27,10 @@ def main(argv: list[str] | None = None) -> int:
                     settings,
                     batch_name=args.batch_name,
                     stop_on_error=True if args.stop_on_error else None,
+                    export_options=_build_batch_export_options(args),
                 )
             else:
+                _validate_single_run_args(args)
                 task_text = _resolve_task_text(args)
                 result = run_command(
                     task_text,
@@ -90,13 +92,20 @@ def run_batch_command(
     *,
     batch_name: str | None = None,
     stop_on_error: bool | None = None,
+    export_options: BatchExportOptions | dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     request = load_batch_request_file(
         batch_file,
         batch_name=batch_name,
         stop_on_error=stop_on_error,
     )
-    return run_batch_request(request, settings)
+    result = run_batch_request(request, settings)
+    if export_options is None:
+        return result
+
+    output = dict(result)
+    output["artifacts_export"] = export_batch_results(result, export_options)
+    return output
 
 
 
@@ -155,6 +164,29 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Stop a batch after the first failed task",
     )
+    run_parser.add_argument(
+        "--output-dir",
+        dest="output_dir",
+        help="Output directory for exported batch artifacts",
+    )
+    run_parser.add_argument(
+        "--export-json",
+        dest="export_json",
+        action="store_true",
+        help="Export a full batch result json snapshot",
+    )
+    run_parser.add_argument(
+        "--export-jsonl",
+        dest="export_jsonl",
+        action="store_true",
+        help="Export line-oriented per-task batch results",
+    )
+    run_parser.add_argument(
+        "--export-md",
+        dest="export_md",
+        action="store_true",
+        help="Export a minimal markdown batch summary",
+    )
     run_parser.add_argument("--task-type", dest="task_type", help="Optional task type override")
     run_parser.add_argument("--workflow-profile-id", dest="workflow_profile_id", help="Canonical workflow profile id")
     run_parser.add_argument("--workflow-profile", dest="workflow_profile", help="Workflow profile alias")
@@ -207,6 +239,30 @@ def _result_succeeded(args, result: dict[str, Any]) -> bool:
 
 
 
+def _build_batch_export_options(args) -> BatchExportOptions | None:
+    output_dir = getattr(args, "output_dir", None)
+    export_json = bool(getattr(args, "export_json", False))
+    export_jsonl = bool(getattr(args, "export_jsonl", False))
+    export_md = bool(getattr(args, "export_md", False))
+    has_explicit_formats = export_json or export_jsonl or export_md
+
+    if not output_dir:
+        if has_explicit_formats:
+            raise ValueError("export format flags require --output-dir")
+        return None
+
+    if has_explicit_formats:
+        return BatchExportOptions(
+            output_dir=output_dir,
+            write_json=export_json,
+            write_jsonl=export_jsonl,
+            write_markdown_summary=export_md,
+        )
+
+    return BatchExportOptions(output_dir=output_dir)
+
+
+
 def _validate_batch_run_args(args) -> None:
     if getattr(args, "task_text", None):
         raise ValueError("--batch-file cannot be combined with --task")
@@ -223,6 +279,14 @@ def _validate_batch_run_args(args) -> None:
         value = getattr(args, field_name, None)
         if value:
             raise ValueError(f"--batch-file cannot be combined with --{field_name.replace('_', '-')}")
+
+
+
+def _validate_single_run_args(args) -> None:
+    for field_name in ("output_dir", "export_json", "export_jsonl", "export_md", "batch_name", "stop_on_error"):
+        value = getattr(args, field_name, None)
+        if value:
+            raise ValueError(f"--{field_name.replace('_', '-')} is only supported with --batch-file")
 
 
 if __name__ == "__main__":

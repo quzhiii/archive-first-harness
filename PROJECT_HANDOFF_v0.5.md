@@ -1,6 +1,6 @@
-# PROJECT_HANDOFF_v0.5
+﻿# PROJECT_HANDOFF_v0.5
 
-This handoff is the canonical resume note for continuing the AI agent runtime harness from the narrow `v0.5.x` batch surface checkpoint in a new chat, a new model, or another coding agent such as Claude Code or OpenCode.
+This handoff is the canonical resume note for continuing the AI agent runtime harness from the narrow `v0.5.x` batch export checkpoint in a new chat, a new model, or another coding agent such as Claude Code or OpenCode.
 
 ## 1. Current Snapshot
 
@@ -8,13 +8,15 @@ This handoff is the canonical resume note for continuing the AI agent runtime ha
 - Architecture boundary: `entrypoints/ -> runtime/ -> harness/`
 - Base frozen baseline: `B v0.4` via `b-v0.4-baseline`
 - Intermediate stable slice: `b-v0.5-profile-surface`
-- Current stable continuation slice: narrow `v0.5.x` batch / automation-friendly surface layer
+- Intermediate stable slice: `b-v0.5-batch-surface`
+- Current stable continuation slice: narrow `v0.5.x` automation artifacts / batch report export layer
 - Stable tags:
   - `b-v0.3-baseline`
   - `b-v0.4-baseline`
   - `b-v0.5-profile-surface`
   - `b-v0.5-batch-surface`
-- Current `HEAD` after closeout: the tagged `b-v0.5-batch-surface` checkpoint commit
+  - `b-v0.5-batch-export`
+- Current `HEAD` after closeout: the tagged `b-v0.5-batch-export` checkpoint commit
 - Working tree expectation after closeout: clean
 - Full-suite verification command:
 
@@ -22,8 +24,8 @@ This handoff is the canonical resume note for continuing the AI agent runtime ha
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-- Expected closeout result: `Ran 205 tests`, `OK`
-- Resume point lineage: this checkpoint is built on top of `b-v0.4-baseline` and `b-v0.5-profile-surface`, not as a replacement for either
+- Expected closeout result: `Ran 212 tests`, `OK`
+- Resume point lineage: this checkpoint is built on top of `b-v0.4-baseline`, `b-v0.5-profile-surface`, and `b-v0.5-batch-surface`, not as a replacement for any of them
 
 ## 2. What Has Been Added Since v0.4
 
@@ -133,6 +135,29 @@ Key files:
 - `entrypoints/task_runner.py`
 - `tests/test_batch_task_runner.py`
 
+### F. Automation Artifacts / Batch Report Export
+
+Added a thin export layer on top of the existing batch result:
+
+- `BatchExportOptions`
+- `export_batch_results(...)`
+- CLI export flags:
+  - `--output-dir`
+  - `--export-json`
+  - `--export-jsonl`
+  - `--export-md`
+- default export set when only `--output-dir` is provided:
+  - JSON snapshot for machine-readable batch state
+  - JSONL per-task lines for scripts and pipelines
+  - Markdown summary for quick human review
+- the export layer only consumes an existing batch result and does not rewrite batch semantics or runtime/evaluation payloads
+
+Key files:
+
+- `entrypoints/batch_export.py`
+- `entrypoints/cli.py`
+- `tests/test_batch_export.py`
+
 ## 3. What Did NOT Change
 
 These boundaries are still intentionally preserved:
@@ -146,6 +171,7 @@ These boundaries are still intentionally preserved:
 - no HTTP server / FastAPI shell was added
 - no queue / scheduler / async worker was added
 - no batch-driven adaptive replanning or cross-task input mutation was added
+- no run-history persistence system or artifact indexing layer was added
 
 ## 4. Verification State
 
@@ -157,7 +183,7 @@ python -m unittest discover -s tests -p "test_*.py"
 
 Expected closeout result:
 
-- `Ran 205 tests`
+- `Ran 212 tests`
 - `OK`
 
 Focused tests that cover the `v0.5.x` slice:
@@ -168,6 +194,7 @@ python -m unittest discover -s tests -p "test_profile_interpretation.py"
 python -m unittest discover -s tests -p "test_profile_input_adapter.py"
 python -m unittest discover -s tests -p "test_surface_task_runner.py"
 python -m unittest discover -s tests -p "test_batch_task_runner.py"
+python -m unittest discover -s tests -p "test_batch_export.py"
 python -m unittest discover -s tests -p "test_runtime_evaluation_integration.py"
 ```
 
@@ -188,16 +215,23 @@ Use `b-v0.5-profile-surface` when:
 
 Use `b-v0.5-batch-surface` when:
 
-- you need the current stable `v0.5.x` surface
-- you need both single-task and sequential batch entry points
+- you need stable sequential batch execution
 - you need CLI `run --batch-file ...` or batch file loading for automation
-- you want the latest stable outer surface without moving to HTTP/API serving
+- you want the latest stable outer surface before export/report artifacts were added
+
+Use `b-v0.5-batch-export` when:
+
+- you need the current stable `v0.5.x` surface
+- you need stable batch result export for automation
+- you need CLI export flags or `export_batch_results(...)`
+- you want JSON, JSONL, and Markdown batch artifacts without moving to HTTP/API serving
 
 In short:
 
 - `v0.4` is the last profile-agnostic frozen baseline
 - `b-v0.5-profile-surface` is the stable restore point before batch was added
-- `b-v0.5-batch-surface` is the current stable restore point for profile-aware and automation-friendly surface work
+- `b-v0.5-batch-surface` is the stable restore point before export/report artifacts were added
+- `b-v0.5-batch-export` is the current stable restore point for profile-aware, batch-capable, and export-capable surface work
 
 ## 6. Important Files To Read First
 
@@ -215,25 +249,27 @@ If another agent takes over from this checkpoint, read these first:
 10. `planner/task_contract_builder.py`
 11. `entrypoints/task_runner.py`
 12. `entrypoints/batch_runner.py`
-13. `entrypoints/cli.py`
-14. `runtime/orchestrator.py`
-15. `tests/test_workflow_profile.py`
-16. `tests/test_profile_interpretation.py`
-17. `tests/test_profile_input_adapter.py`
-18. `tests/test_surface_task_runner.py`
-19. `tests/test_batch_task_runner.py`
-20. `tests/test_runtime_evaluation_integration.py`
+13. `entrypoints/batch_export.py`
+14. `entrypoints/cli.py`
+15. `runtime/orchestrator.py`
+16. `tests/test_workflow_profile.py`
+17. `tests/test_profile_interpretation.py`
+18. `tests/test_profile_input_adapter.py`
+19. `tests/test_surface_task_runner.py`
+20. `tests/test_batch_task_runner.py`
+21. `tests/test_batch_export.py`
+22. `tests/test_runtime_evaluation_integration.py`
 
 ## 7. Recommended Next Step
 
 The next most compatible direction is:
 
-### `automation artifacts / batch report export`
+### `artifact indexing / run history manifest`
 
 Reason:
 
-- the batch surface is now stable and sequential
-- artifacts/report export extends the outer automation layer without expanding runtime control semantics
+- the batch export layer now produces stable files
+- indexing/manifest work extends the outer artifact layer without expanding runtime control semantics
 - it is a smaller semantic step than introducing an HTTP/API server shell immediately
 
 A minimal HTTP/API server shell is now feasible, but it is still the larger next step and should stay out of this closeout.
@@ -250,6 +286,7 @@ It is a controlled outer-surface slice:
 - stable profile input normalization
 - a thin single-task surface through function call and CLI
 - a thin sequential batch surface for automation-friendly reuse
+- a thin batch export layer for JSON, JSONL, and Markdown artifacts
 
 The most important operational fact for a new agent is this:
-resume from `b-v0.5-batch-surface` if the work depends on profile-aware input, batch file automation, or the current stable outer surface; otherwise resume from `b-v0.5-profile-surface` or `b-v0.4-baseline` depending on how far back you need to go.
+resume from `b-v0.5-batch-export` if the work depends on profile-aware input, batch automation, or stable export/report artifacts; otherwise resume from `b-v0.5-batch-surface`, `b-v0.5-profile-surface`, or `b-v0.4-baseline` depending on how far back you need to go.

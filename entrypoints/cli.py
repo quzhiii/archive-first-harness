@@ -7,6 +7,8 @@ from typing import Any
 
 from entrypoints.batch_export import BatchExportOptions, export_batch_results
 from entrypoints.batch_runner import load_batch_request_file, run_batch_request
+from entrypoints.history_summary import write_latest_run_pointer, write_run_history_summary
+from entrypoints.run_history import append_run_history_entry
 from entrypoints.settings import load_settings
 from entrypoints.task_runner import SurfaceTaskRequest, run_task_request, surface_result_succeeded
 from runtime.executor import Executor
@@ -28,6 +30,9 @@ def main(argv: list[str] | None = None) -> int:
                     batch_name=args.batch_name,
                     stop_on_error=True if args.stop_on_error else None,
                     export_options=_build_batch_export_options(args),
+                    history_file=_build_batch_history_file(args),
+                    write_history_summary=bool(args.write_history_summary),
+                    history_summary_limit=_build_history_summary_limit(args),
                 )
             else:
                 _validate_single_run_args(args)
@@ -93,6 +98,9 @@ def run_batch_command(
     batch_name: str | None = None,
     stop_on_error: bool | None = None,
     export_options: BatchExportOptions | dict[str, Any] | None = None,
+    history_file: str | None = None,
+    write_history_summary: bool = False,
+    history_summary_limit: int = 20,
 ) -> dict[str, Any]:
     request = load_batch_request_file(
         batch_file,
@@ -101,10 +109,26 @@ def run_batch_command(
     )
     result = run_batch_request(request, settings)
     if export_options is None:
+        if history_file:
+            raise ValueError("--history-file requires batch export to be enabled")
+        if write_history_summary:
+            raise ValueError("history summary requires batch export to be enabled")
         return result
 
     output = dict(result)
-    output["artifacts_export"] = export_batch_results(result, export_options)
+    export_result = export_batch_results(result, export_options)
+    output["artifacts_export"] = export_result
+    history_result = append_run_history_entry(result, export_result, history_file=history_file)
+    output["run_history"] = history_result
+    history_index: dict[str, Any] = {
+        "latest_run": write_latest_run_pointer(history_result["history_file"]),
+    }
+    if write_history_summary:
+        history_index["history_summary"] = write_run_history_summary(
+            history_result["history_file"],
+            limit=history_summary_limit,
+        )
+    output["history_index"] = history_index
     return output
 
 
@@ -168,6 +192,23 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         dest="output_dir",
         help="Output directory for exported batch artifacts",
+    )
+    run_parser.add_argument(
+        "--history-file",
+        dest="history_file",
+        help="Optional run history manifest file path. Defaults to <output-dir>/run_history.jsonl.",
+    )
+    run_parser.add_argument(
+        "--write-history-summary",
+        dest="write_history_summary",
+        action="store_true",
+        help="Write a compact run history summary json derived from the manifest.",
+    )
+    run_parser.add_argument(
+        "--history-summary-limit",
+        dest="history_summary_limit",
+        type=int,
+        help="Optional recent-entry limit for run_history_summary.json. Defaults to 20 when enabled.",
     )
     run_parser.add_argument(
         "--export-json",
@@ -241,6 +282,9 @@ def _result_succeeded(args, result: dict[str, Any]) -> bool:
 
 def _build_batch_export_options(args) -> BatchExportOptions | None:
     output_dir = getattr(args, "output_dir", None)
+    history_file = getattr(args, "history_file", None)
+    write_history_summary = bool(getattr(args, "write_history_summary", False))
+    history_summary_limit = getattr(args, "history_summary_limit", None)
     export_json = bool(getattr(args, "export_json", False))
     export_jsonl = bool(getattr(args, "export_jsonl", False))
     export_md = bool(getattr(args, "export_md", False))
@@ -249,6 +293,10 @@ def _build_batch_export_options(args) -> BatchExportOptions | None:
     if not output_dir:
         if has_explicit_formats:
             raise ValueError("export format flags require --output-dir")
+        if history_file:
+            raise ValueError("--history-file requires --output-dir")
+        if write_history_summary or history_summary_limit is not None:
+            raise ValueError("history summary flags require --output-dir")
         return None
 
     if has_explicit_formats:
@@ -260,6 +308,31 @@ def _build_batch_export_options(args) -> BatchExportOptions | None:
         )
 
     return BatchExportOptions(output_dir=output_dir)
+
+
+
+def _build_batch_history_file(args) -> str | None:
+    history_file = getattr(args, "history_file", None)
+    if history_file:
+        return str(history_file)
+    if getattr(args, "output_dir", None):
+        return None
+    return None
+
+
+
+def _build_history_summary_limit(args) -> int:
+    write_history_summary = bool(getattr(args, "write_history_summary", False))
+    history_summary_limit = getattr(args, "history_summary_limit", None)
+    if history_summary_limit is not None and not write_history_summary:
+        raise ValueError("--history-summary-limit requires --write-history-summary")
+    if not write_history_summary:
+        return 20
+    if history_summary_limit is None:
+        return 20
+    if history_summary_limit < 0:
+        raise ValueError("--history-summary-limit must be non-negative")
+    return int(history_summary_limit)
 
 
 
@@ -283,7 +356,17 @@ def _validate_batch_run_args(args) -> None:
 
 
 def _validate_single_run_args(args) -> None:
-    for field_name in ("output_dir", "export_json", "export_jsonl", "export_md", "batch_name", "stop_on_error"):
+    for field_name in (
+        "output_dir",
+        "history_file",
+        "write_history_summary",
+        "history_summary_limit",
+        "export_json",
+        "export_jsonl",
+        "export_md",
+        "batch_name",
+        "stop_on_error",
+    ):
         value = getattr(args, field_name, None)
         if value:
             raise ValueError(f"--{field_name.replace('_', '-')} is only supported with --batch-file")

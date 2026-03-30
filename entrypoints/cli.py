@@ -7,6 +7,7 @@ from typing import Any
 
 from entrypoints.batch_export import BatchExportOptions, export_batch_results
 from entrypoints.batch_runner import load_batch_request_file, run_batch_request
+from entrypoints.history_browse import browse_run_history, read_latest_run, read_run_history_summary
 from entrypoints.history_summary import write_latest_run_pointer, write_run_history_summary
 from entrypoints.run_history import append_run_history_entry
 from entrypoints.settings import load_settings
@@ -56,6 +57,19 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "inspect-contract":
             _print_json(inspect_contract_command(settings))
+            return 0
+
+        if args.command == "history":
+            _validate_history_args(args)
+            print(
+                history_command(
+                    settings,
+                    history_file=args.history_file,
+                    latest=bool(args.latest),
+                    summary=bool(args.summary),
+                    limit=args.limit,
+                )
+            )
             return 0
 
         raise ValueError(f"unsupported command: {args.command}")
@@ -173,6 +187,29 @@ def inspect_contract_command(settings) -> dict[str, Any]:
 
 
 
+def history_command(
+    settings,
+    *,
+    history_file: str | None = None,
+    latest: bool = False,
+    summary: bool = False,
+    limit: int | None = None,
+) -> str:
+    resolved_history_file = str(history_file or (settings.artifacts_dir / "run_history.jsonl"))
+    if latest:
+        payload = read_latest_run(resolved_history_file)
+        return _format_latest_run_output(payload)
+
+    effective_limit = 10 if limit is None else int(limit)
+    if summary:
+        payload = read_run_history_summary(resolved_history_file, limit=effective_limit)
+        return _format_history_summary_output(payload)
+
+    payload = browse_run_history(resolved_history_file, limit=effective_limit)
+    return _format_history_summary_output(payload)
+
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Minimal CLI for the profile-aware runtime harness")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -247,6 +284,31 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("inspect-state", help="Inspect persisted state summary")
     subparsers.add_parser("inspect-contract", help="Inspect the latest contract summary")
+
+    history_parser = subparsers.add_parser("history", help="Browse recent run history artifacts")
+    history_parser.add_argument(
+        "--history-file",
+        dest="history_file",
+        help="Path to run_history.jsonl. Defaults to <artifacts-dir>/run_history.jsonl.",
+    )
+    history_parser.add_argument(
+        "--latest",
+        dest="latest",
+        action="store_true",
+        help="Show the latest run pointer or manifest-derived latest run.",
+    )
+    history_parser.add_argument(
+        "--summary",
+        dest="summary",
+        action="store_true",
+        help="Show recent run history summary entries.",
+    )
+    history_parser.add_argument(
+        "--limit",
+        dest="limit",
+        type=int,
+        help="Optional recent-entry limit for history browsing. Defaults to 10.",
+    )
     return parser
 
 
@@ -370,6 +432,83 @@ def _validate_single_run_args(args) -> None:
         value = getattr(args, field_name, None)
         if value:
             raise ValueError(f"--{field_name.replace('_', '-')} is only supported with --batch-file")
+
+
+
+def _validate_history_args(args) -> None:
+    if getattr(args, "latest", False) and getattr(args, "summary", False):
+        raise ValueError("--latest cannot be combined with --summary")
+    limit = getattr(args, "limit", None)
+    if limit is not None and limit < 0:
+        raise ValueError("--limit must be non-negative")
+    if getattr(args, "latest", False) and limit is not None:
+        raise ValueError("--limit is not used with --latest")
+
+
+
+def _format_latest_run_output(payload: dict[str, Any]) -> str:
+    latest_run = payload.get("latest_run")
+    if not isinstance(latest_run, dict):
+        raise ValueError("latest run payload is invalid")
+    return "\n".join(
+        [
+            "Latest run",
+            f"source: {payload.get('source', 'unknown')}",
+            f"history_file: {payload.get('history_file', '')}",
+            f"run_id: {latest_run.get('run_id', '')}",
+            f"created_at: {latest_run.get('created_at', '')}",
+            f"batch_name: {latest_run.get('batch_name', '')}",
+            "totals: "
+            + f"total={latest_run.get('total_tasks', 0)} "
+            + f"completed={latest_run.get('completed_tasks', 0)} "
+            + f"failed={latest_run.get('failed_tasks', 0)} "
+            + f"stopped_early={'yes' if latest_run.get('stopped_early') else 'no'}",
+            f"formats: {_format_formats(latest_run.get('formats'))}",
+            f"output_dir: {latest_run.get('output_dir', '')}",
+        ]
+    )
+
+
+
+def _format_history_summary_output(payload: dict[str, Any]) -> str:
+    entries = payload.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("history summary payload is invalid")
+    lines = [
+        "History summary",
+        f"source: {payload.get('source', 'unknown')}",
+        f"history_file: {payload.get('history_file', '')}",
+        f"entry_count: {payload.get('entry_count', 0)}",
+        f"limit: {payload.get('limit', 0)}",
+    ]
+    if not entries:
+        lines.append("entries: none")
+        return "\n".join(lines)
+    lines.extend(["entries:"])
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        lines.append(
+            "- "
+            + f"{entry.get('run_id', '')} | "
+            + f"{entry.get('created_at', '')} | "
+            + f"batch={entry.get('batch_name', '')} | "
+            + f"total={entry.get('total_tasks', 0)} | "
+            + f"completed={entry.get('completed_tasks', 0)} | "
+            + f"failed={entry.get('failed_tasks', 0)} | "
+            + f"stopped_early={'yes' if entry.get('stopped_early') else 'no'} | "
+            + f"formats={_format_formats(entry.get('formats'))} | "
+            + f"output_dir={entry.get('output_dir', '')}"
+        )
+    return "\n".join(lines)
+
+
+
+def _format_formats(value: object) -> str:
+    if not isinstance(value, list):
+        return "none"
+    items = [str(item).strip() for item in value if str(item).strip()]
+    return ",".join(items) if items else "none"
 
 
 if __name__ == "__main__":

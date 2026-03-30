@@ -1,6 +1,6 @@
 ﻿# PROJECT_HANDOFF_v0.5
 
-This handoff is the canonical resume note for continuing the AI agent runtime harness from the narrow `v0.5.x` history summary checkpoint in a new chat, a new model, or another coding agent such as Claude Code or OpenCode.
+This handoff is the canonical resume note for continuing the AI agent runtime harness from the narrow `v0.5.x` history browsing checkpoint in a new chat, a new model, or another coding agent such as Claude Code or OpenCode.
 
 ## 1. Current Snapshot
 
@@ -10,7 +10,8 @@ This handoff is the canonical resume note for continuing the AI agent runtime ha
 - Intermediate stable slice: `b-v0.5-profile-surface`
 - Intermediate stable slice: `b-v0.5-batch-surface`
 - Intermediate stable slice: `b-v0.5-batch-export`
-- Current stable continuation slice: narrow `v0.5.x` history summary / latest-run pointer layer
+- Intermediate stable slice: `b-v0.5-history-summary`
+- Current stable continuation slice: narrow `v0.5.x` history browsing / latest-run convenience layer
 - Stable tags:
   - `b-v0.3-baseline`
   - `b-v0.4-baseline`
@@ -18,7 +19,8 @@ This handoff is the canonical resume note for continuing the AI agent runtime ha
   - `b-v0.5-batch-surface`
   - `b-v0.5-batch-export`
   - `b-v0.5-history-summary`
-- Current `HEAD` after closeout: the tagged `b-v0.5-history-summary` checkpoint commit
+  - `b-v0.5-history-browsing`
+- Current `HEAD` after closeout: the tagged `b-v0.5-history-browsing` checkpoint commit
 - Working tree expectation after closeout: clean
 - Full-suite verification command:
 
@@ -26,8 +28,8 @@ This handoff is the canonical resume note for continuing the AI agent runtime ha
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-- Expected closeout result: `Ran 226 tests`, `OK`
-- Resume point lineage: this checkpoint is built on top of `b-v0.4-baseline`, `b-v0.5-profile-surface`, `b-v0.5-batch-surface`, and `b-v0.5-batch-export`, not as a replacement for any of them
+- Expected closeout result: `Ran 238 tests`, `OK`
+- Resume point lineage: this checkpoint is built on top of `b-v0.4-baseline`, `b-v0.5-profile-surface`, `b-v0.5-batch-surface`, `b-v0.5-batch-export`, and `b-v0.5-history-summary`, not as a replacement for any of them
 
 ## 2. What Has Been Added Since v0.4
 
@@ -197,6 +199,31 @@ Key files:
 - `entrypoints/cli.py`
 - `tests/test_history_summary.py`
 
+### I. History Browsing / Latest-Run Convenience Commands
+
+Added a thin read-only browsing layer on top of the existing history artifacts:
+
+- `read_latest_run(...)`
+- `read_run_history_summary(...)`
+- `browse_run_history(...)`
+- CLI `history` subcommand with:
+  - `--history-file`
+  - `--latest`
+  - `--summary`
+  - `--limit`
+- reading rules remain conservative:
+  - prefer `latest_run.json` for latest-run reads
+  - prefer `run_history_summary.json` for recent-summary reads
+  - fall back to `run_history.jsonl` when needed
+  - never write back during fallback
+- append-only truth remains `run_history.jsonl`
+
+Key files:
+
+- `entrypoints/history_browse.py`
+- `entrypoints/cli.py`
+- `tests/test_history_browse.py`
+
 ## 3. What Did NOT Change
 
 These boundaries are still intentionally preserved:
@@ -211,6 +238,8 @@ These boundaries are still intentionally preserved:
 - no queue / scheduler / async worker was added
 - no batch-driven adaptive replanning or cross-task input mutation was added
 - no database or search system was added
+- no artifact search or filter engine was added
+- browsing helpers only read existing history artifacts and do not become a history state manager
 - append-only truth remains `run_history.jsonl`
 
 ## 4. Verification State
@@ -223,7 +252,7 @@ python -m unittest discover -s tests -p "test_*.py"
 
 Expected closeout result:
 
-- `Ran 226 tests`
+- `Ran 238 tests`
 - `OK`
 
 Focused tests that cover the `v0.5.x` slice:
@@ -237,6 +266,7 @@ python -m unittest discover -s tests -p "test_batch_task_runner.py"
 python -m unittest discover -s tests -p "test_batch_export.py"
 python -m unittest discover -s tests -p "test_run_history.py"
 python -m unittest discover -s tests -p "test_history_summary.py"
+python -m unittest discover -s tests -p "test_history_browse.py"
 python -m unittest discover -s tests -p "test_runtime_evaluation_integration.py"
 ```
 
@@ -269,10 +299,16 @@ Use `b-v0.5-batch-export` when:
 
 Use `b-v0.5-history-summary` when:
 
-- you need the current stable `v0.5.x` surface
 - you need manifest-backed run history plus latest-run pointer support
 - you need optional recent-history summary files for automation
-- you want the latest stable outer surface without moving to browsing commands or HTTP/API serving
+- you want the stable outer surface before browsing commands were added
+
+Use `b-v0.5-history-browsing` when:
+
+- you need the current stable `v0.5.x` surface
+- you need manifest-backed run history plus latest-run pointer support
+- you need recent-history summary files and read-only browsing helpers
+- you need CLI `history` convenience commands without moving to HTTP/API serving
 
 In short:
 
@@ -280,7 +316,8 @@ In short:
 - `b-v0.5-profile-surface` is the stable restore point before batch was added
 - `b-v0.5-batch-surface` is the stable restore point before export/report artifacts were added
 - `b-v0.5-batch-export` is the stable restore point before history/summary layers were added
-- `b-v0.5-history-summary` is the current stable restore point for profile-aware, batch-capable, export-capable, and history-summary-capable surface work
+- `b-v0.5-history-summary` is the stable restore point before browsing/convenience commands were added
+- `b-v0.5-history-browsing` is the current stable restore point for profile-aware, batch-capable, export-capable, history-summary-capable, and history-browsing-capable surface work
 
 ## 6. Important Files To Read First
 
@@ -301,28 +338,30 @@ If another agent takes over from this checkpoint, read these first:
 13. `entrypoints/batch_export.py`
 14. `entrypoints/run_history.py`
 15. `entrypoints/history_summary.py`
-16. `entrypoints/cli.py`
-17. `runtime/orchestrator.py`
-18. `tests/test_workflow_profile.py`
-19. `tests/test_profile_interpretation.py`
-20. `tests/test_profile_input_adapter.py`
-21. `tests/test_surface_task_runner.py`
-22. `tests/test_batch_task_runner.py`
-23. `tests/test_batch_export.py`
-24. `tests/test_run_history.py`
-25. `tests/test_history_summary.py`
-26. `tests/test_runtime_evaluation_integration.py`
+16. `entrypoints/history_browse.py`
+17. `entrypoints/cli.py`
+18. `runtime/orchestrator.py`
+19. `tests/test_workflow_profile.py`
+20. `tests/test_profile_interpretation.py`
+21. `tests/test_profile_input_adapter.py`
+22. `tests/test_surface_task_runner.py`
+23. `tests/test_batch_task_runner.py`
+24. `tests/test_batch_export.py`
+25. `tests/test_run_history.py`
+26. `tests/test_history_summary.py`
+27. `tests/test_history_browse.py`
+28. `tests/test_runtime_evaluation_integration.py`
 
 ## 7. Recommended Next Step
 
 The next most compatible direction is:
 
-### `history browsing / latest-run convenience commands`
+### `history convenience polish / last-run shortcuts`
 
 Reason:
 
-- the history summary layer already produces stable manifest-derived files
-- browsing/convenience commands extend the current outer history layer without expanding runtime control semantics
+- the current browsing layer is already stable and read-only
+- last-run shortcuts or slightly more ergonomic convenience polish can still stay in the outer history layer
 - it is a smaller semantic step than introducing an HTTP/API server shell immediately
 
 A minimal HTTP/API server shell is now feasible, but it is still the larger next step and should stay out of this closeout.
@@ -342,6 +381,7 @@ It is a controlled outer-surface slice:
 - a thin batch export layer for JSON, JSONL, and Markdown artifacts
 - a thin append-only run history layer
 - a thin history summary and latest-run pointer layer derived from that manifest
+- a thin read-only history browsing and convenience-command layer on top of those history files
 
 The most important operational fact for a new agent is this:
-resume from `b-v0.5-history-summary` if the work depends on profile-aware input, batch automation, stable export/report artifacts, or manifest-derived latest-run/history-summary files; otherwise resume from an earlier stable tag depending on how far back you need to go.
+resume from `b-v0.5-history-browsing` if the work depends on profile-aware input, batch automation, stable export/report artifacts, manifest-derived latest-run/history-summary files, or CLI history browsing; otherwise resume from an earlier stable tag depending on how far back you need to go.

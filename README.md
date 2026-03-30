@@ -7,7 +7,7 @@ It is not a full agent platform.
 ## Current Stable Slice
 
 The frozen baseline is still `B v0.4` via `b-v0.4-baseline`.
-On top of that baseline, the current stable recovery slice is a narrow `v0.5.x` layer focused on profile semantics, sequential batch execution, stable export artifacts, and a thin manifest-derived history summary layer.
+On top of that baseline, the current stable recovery slice is a narrow `v0.5.x` layer focused on profile semantics, sequential batch execution, stable export artifacts, manifest-derived history files, and a thin history browsing / latest-run convenience layer.
 
 The current `v0.5.x` slice adds:
 
@@ -20,7 +20,8 @@ The current `v0.5.x` slice adds:
 - `BatchExportOptions` and `export_batch_results(...)` as a thin export layer for batch artifacts
 - `RunHistoryEntry`, `append_run_history_entry(...)`, and `list_run_history(...)` as an append-only export history manifest layer
 - `RunHistorySummaryEntry`, `write_latest_run_pointer(...)`, and `write_run_history_summary(...)` as a thin latest-run pointer and recent-history summary layer
-- a thin CLI surface that forwards batch execution, export, history, and summary options through the same outer entry path
+- `read_latest_run(...)`, `read_run_history_summary(...)`, and `browse_run_history(...)` as a thin read-only history browsing layer
+- a thin CLI surface that forwards batch execution, export, history writing, summary writing, and history browsing through the same outer entry path
 
 This is still a conservative runtime harness. It does not implement HTTP serving, async workers, queue orchestration, auto-execution governance, or rich memory systems.
 
@@ -32,13 +33,13 @@ The current execution and evaluation chain is still single-path inside the runti
 
 The current batch, export, and history path is only a thin outer layer:
 
-`batch request / --batch-file -> SurfaceBatchRequest -> run_batch_request(...) -> repeated run_task_request(...) -> export_batch_results(...) -> append_run_history_entry(...) -> write_latest_run_pointer(...) / write_run_history_summary(...)`
+`batch request / --batch-file -> SurfaceBatchRequest -> run_batch_request(...) -> repeated run_task_request(...) -> export_batch_results(...) -> append_run_history_entry(...) -> write_latest_run_pointer(...) / write_run_history_summary(...) -> read_latest_run(...) / read_run_history_summary(...) / browse_run_history(...)`
 
 The chain remains deliberately advisory-only.
 
 ## Current Directory Shape
 
-- `entrypoints/`: thin CLI, settings loader, single-task runner, minimal batch runner surface, batch export helper, run history manifest helper, and history summary helper
+- `entrypoints/`: thin CLI, settings loader, single-task runner, minimal batch runner surface, batch export helper, run history manifest helper, history summary helper, and history browse helper
 - `planner/`: task contract builder and interviewer
 - `runtime/`: orchestrator, executor, verifier, model router, methodology router
 - `harness/contracts/`: workflow profiles and profile input normalization
@@ -50,7 +51,7 @@ The chain remains deliberately advisory-only.
 - `harness/sandbox/`: stub isolation and rollback abstractions
 - `harness/telemetry/`: local tracing and metrics aggregation
 - `harness/evaluation/`: baseline compare, evaluator input bundle, profile interpretation, realm evaluator
-- `tests/`: focused unit, smoke, integration, batch surface, export, run history, and history summary tests
+- `tests/`: focused unit, smoke, integration, batch surface, export, run history, history summary, and history browsing tests
 
 ## Freeze Status
 
@@ -58,7 +59,8 @@ The chain remains deliberately advisory-only.
 - Intermediate `v0.5.x` profile-aware surface tag: `b-v0.5-profile-surface`
 - Intermediate `v0.5.x` batch surface tag: `b-v0.5-batch-surface`
 - Intermediate `v0.5.x` batch export tag: `b-v0.5-batch-export`
-- Current stable `v0.5.x` history summary closeout tag: `b-v0.5-history-summary`
+- Intermediate `v0.5.x` history summary closeout tag: `b-v0.5-history-summary`
+- Current stable `v0.5.x` history browsing closeout tag: `b-v0.5-history-browsing`
 - Base baseline closeout commit: `d03be5565642ce385cf529d9eb65ddb199d32215`
 - Expected full-suite verification command:
 
@@ -66,10 +68,10 @@ The chain remains deliberately advisory-only.
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-- Expected current result at closeout: `Ran 226 tests`, `OK`
+- Expected current result at closeout: `Ran 238 tests`, `OK`
 
 `v0.5.x` does not replace the meaning of the frozen `v0.4` baseline.
-It is a narrow profile-aware, batch-capable, export-capable, and history-summary-capable outer surface layer on top of that baseline.
+It is a narrow profile-aware, batch-capable, export-capable, history-summary-capable, and history-browsing-capable outer surface layer on top of that baseline.
 
 ## Running The Minimal CLI
 
@@ -97,6 +99,24 @@ Sequential batch execution with a compact recent-history summary:
 python -m entrypoints.cli run --batch-file tasks.json --output-dir exports --write-history-summary --history-summary-limit 10
 ```
 
+Read the latest recorded run from history artifacts:
+
+```bash
+python -m entrypoints.cli history --history-file exports/run_history.jsonl --latest
+```
+
+Read recent history summary entries:
+
+```bash
+python -m entrypoints.cli history --history-file exports/run_history.jsonl --summary --limit 10
+```
+
+Browse recent history with the default compact output:
+
+```bash
+python -m entrypoints.cli history --history-file exports/run_history.jsonl --limit 10
+```
+
 Inspect persisted state summary:
 
 ```bash
@@ -120,9 +140,11 @@ The minimal function-level surfaces are:
 - `export_batch_results(...)` for writing stable batch artifacts
 - `append_run_history_entry(...)` and `list_run_history(...)` for append-only export history
 - `write_latest_run_pointer(...)` and `write_run_history_summary(...)` for derived history files
+- `read_latest_run(...)`, `read_run_history_summary(...)`, and `browse_run_history(...)` for read-only history browsing
 
 The append-only truth source is `run_history.jsonl`.
 `latest_run.json` and `run_history_summary.json` are derived files only.
+The browsing helpers only read those files and never write them.
 They do not rewrite batch, export, or runtime payloads.
 This surface is intended for tests, automation, and future entry surfaces.
 It is not an HTTP server.
@@ -147,7 +169,7 @@ Baseline collection rule:
 - future baseline diffs should enumerate these JSON files directly or glob only top-level `*.json`
 
 `v0.5.x` does not introduce a new frozen baseline artifact pack.
-It keeps the explicit `v0.3` comparison pack and adds profile-aware interpretation plus minimal single-task, batch, export, history, and history-summary surface handling on top of the existing runtime outputs.
+It keeps the explicit `v0.3` comparison pack and adds profile-aware interpretation plus minimal single-task, batch, export, history, history-summary, and history-browsing surface handling on top of the existing runtime outputs.
 
 ## What The Current System Explicitly Does Not Do
 
@@ -156,8 +178,8 @@ The current version still does not implement:
 - HTTP server / FastAPI shell
 - queue / scheduler / async worker infrastructure
 - batch-driven adaptive replanning or cross-task mutation
-- history browsing or latest-run convenience commands
 - artifact search or filter engine
+- history convenience polish or richer last-run shortcuts beyond the current minimal `history` command
 - database-backed state
 - full-text search or query DSL
 - report templating engines or dashboard systems
@@ -173,12 +195,12 @@ The current version still does not implement:
 
 ## Suggested Next Direction
 
-The next narrow, compatible extension is `history browsing / latest-run convenience commands`.
+The next narrow, compatible extension is `history convenience polish / last-run shortcuts`.
 
 Reason:
 
-- the history summary layer already produces stable manifest-derived files
-- browsing/convenience commands extend the current outer history layer without expanding runtime control semantics
+- the browsing layer already provides a stable read-only consumption path for history artifacts
+- a small amount of convenience polish can stay in the outer history layer without changing runtime semantics
 - it is a smaller and safer step than adding an HTTP server shell immediately
 
 A minimal HTTP/API server shell is now feasible, but it is still the larger next step and should stay out of this checkpoint.

@@ -12,7 +12,15 @@ from unittest.mock import patch
 from entrypoints.batch_export import BatchExportOptions, export_batch_results
 from entrypoints.batch_runner import SurfaceBatchRequest, run_batch_request
 from entrypoints.cli import load_settings, main
-from entrypoints.history_browse import browse_run_history, read_latest_run, read_run_history_summary
+from entrypoints.history_browse import (
+    browse_run_history,
+    find_run_history_entry,
+    format_history_brief,
+    get_latest_run_id,
+    get_latest_run_output_dir,
+    read_latest_run,
+    read_run_history_summary,
+)
 from entrypoints.history_summary import write_latest_run_pointer, write_run_history_summary
 from entrypoints.run_history import append_run_history_entry
 from entrypoints.task_runner import SurfaceTaskRequest
@@ -50,6 +58,13 @@ class HistoryBrowseTests(unittest.TestCase):
         self.assertEqual(payload["source"], "manifest")
         self.assertEqual(payload["latest_run"]["run_id"], "run-two")
         self.assertFalse(latest_run_file.exists())
+
+    def test_get_latest_shortcuts_are_stable_and_reuse_latest_reader(self) -> None:
+        history_file = self._append_runs(["run-one", "run-two"], batch_name="latest-shortcuts")
+        latest_payload = read_latest_run(history_file)
+
+        self.assertEqual(get_latest_run_id(history_file), latest_payload["latest_run"]["run_id"])
+        self.assertEqual(get_latest_run_output_dir(history_file), latest_payload["latest_run"]["output_dir"])
 
     def test_read_summary_uses_summary_file_and_applies_limit(self) -> None:
         history_file = self._append_runs(["run-one", "run-two", "run-three"], batch_name="summary-present")
@@ -92,6 +107,34 @@ class HistoryBrowseTests(unittest.TestCase):
         self.assertEqual(summary_payload["source"], "summary_file")
         self.assertEqual([item["run_id"] for item in summary_payload["entries"]], ["run-two", "run-three"])
 
+    def test_find_run_history_entry_exact_match_falls_back_to_manifest_when_summary_is_truncated(self) -> None:
+        history_file = self._append_runs(["run-one", "run-two", "run-three"], batch_name="find-entry")
+        write_run_history_summary(history_file, limit=1)
+
+        payload = find_run_history_entry(history_file, "run-one")
+
+        self.assertEqual(payload["source"], "manifest")
+        self.assertEqual(payload["entry"]["run_id"], "run-one")
+
+    def test_find_run_history_entry_missing_id_is_explicit(self) -> None:
+        history_file = self._append_runs(["run-one", "run-two"], batch_name="find-missing")
+
+        with self.assertRaisesRegex(LookupError, "run_id not found: missing-run"):
+            find_run_history_entry(history_file, "missing-run")
+
+    def test_format_history_brief_for_single_entry_is_minimal_and_stable(self) -> None:
+        history_file = self._append_runs(["run-one", "run-two"], batch_name="brief-entry")
+        payload = find_run_history_entry(history_file, "run-one")
+
+        output = format_history_brief(payload)
+
+        self.assertIn("History entry", output)
+        self.assertIn("run_id: run-one", output)
+        self.assertIn("batch_name: brief-entry", output)
+        self.assertNotIn("evaluation_input_bundle", output)
+        self.assertNotIn("realm_evaluation", output)
+        self.assertNotIn("{", output)
+
     def test_cli_history_latest_prints_minimal_latest_run_output(self) -> None:
         history_file = self._append_runs(["run-one", "run-two"], batch_name="cli-latest")
         write_latest_run_pointer(history_file)
@@ -108,6 +151,58 @@ class HistoryBrowseTests(unittest.TestCase):
         self.assertIn("run_id: run-two", output)
         self.assertIn("batch_name: cli-latest", output)
         self.assertNotIn("{", output)
+
+    def test_cli_history_last_id_prints_only_run_id(self) -> None:
+        history_file = self._append_runs(["run-one", "run-two"], batch_name="cli-last-id")
+
+        stdout = StringIO()
+        stderr = StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = main(["history", "--history-file", str(history_file), "--last-id"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertEqual(stdout.getvalue().strip(), "run-two")
+
+    def test_cli_history_last_output_dir_prints_only_output_dir(self) -> None:
+        history_file = self._append_runs(["run-one", "run-two"], batch_name="cli-last-output")
+
+        stdout = StringIO()
+        stderr = StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = main(["history", "--history-file", str(history_file), "--last-output-dir"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertEqual(stdout.getvalue().strip(), str((self.temp_dir / "cli-last-output-exports").resolve()))
+
+    def test_cli_history_run_id_prints_single_entry_brief(self) -> None:
+        history_file = self._append_runs(["run-one", "run-two"], batch_name="cli-run-id")
+
+        stdout = StringIO()
+        stderr = StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = main(["history", "--history-file", str(history_file), "--run-id", "run-one"])
+
+        output = stdout.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertIn("History entry", output)
+        self.assertIn("run_id: run-one", output)
+        self.assertIn("batch_name: cli-run-id", output)
+        self.assertNotIn("{", output)
+
+    def test_cli_history_run_id_missing_is_explicit(self) -> None:
+        history_file = self._append_runs(["run-one", "run-two"], batch_name="cli-run-missing")
+
+        stdout = StringIO()
+        stderr = StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = main(["history", "--history-file", str(history_file), "--run-id", "missing-run"])
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("run_id not found: missing-run", stderr.getvalue())
 
     def test_cli_history_summary_prints_recent_entries(self) -> None:
         history_file = self._append_runs(["run-one", "run-two", "run-three"], batch_name="cli-summary")
@@ -148,6 +243,9 @@ class HistoryBrowseTests(unittest.TestCase):
         read_latest_run(history_file)
         read_run_history_summary(history_file, limit=1)
         browse_run_history(history_file, limit=1)
+        get_latest_run_id(history_file)
+        get_latest_run_output_dir(history_file)
+        find_run_history_entry(history_file, "run-one")
 
         self.assertEqual(history_file.read_text(encoding="utf-8"), before_manifest)
         self.assertFalse((history_file.parent / "latest_run.json").exists())
@@ -170,11 +268,16 @@ class HistoryBrowseTests(unittest.TestCase):
 
         latest_payload = read_latest_run(history_file)
         summary_payload = read_run_history_summary(history_file, limit=1)
+        entry_payload = find_run_history_entry(history_file, "run-one")
+        latest_output = format_history_brief(latest_payload)
+        entry_output = format_history_brief(entry_payload)
 
         latest_json = json.dumps(latest_payload, ensure_ascii=True)
         summary_json = json.dumps(summary_payload, ensure_ascii=True)
         self.assertNotIn("evaluation_input_bundle", latest_json)
         self.assertNotIn("realm_evaluation", summary_json)
+        self.assertNotIn("evaluation_input_bundle", entry_output)
+        self.assertNotIn("realm_evaluation", latest_output)
 
     def _append_runs(self, run_ids: list[str], *, batch_name: str) -> Path:
         batch_result, export_result = self._sample_batch_and_export(batch_name=batch_name)
@@ -203,3 +306,4 @@ class HistoryBrowseTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

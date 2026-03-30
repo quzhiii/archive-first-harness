@@ -1,6 +1,6 @@
 ﻿# PROJECT_HANDOFF_v0.5
 
-This handoff is the canonical resume note for continuing the AI agent runtime harness from the narrow `v0.5.x` history browsing checkpoint in a new chat, a new model, or another coding agent such as Claude Code or OpenCode.
+This handoff is the canonical resume note for continuing the AI agent runtime harness from the narrow `v0.5.x` history shortcuts checkpoint in a new chat, a new model, or another coding agent such as Claude Code or OpenCode.
 
 ## 1. Current Snapshot
 
@@ -11,7 +11,8 @@ This handoff is the canonical resume note for continuing the AI agent runtime ha
 - Intermediate stable slice: `b-v0.5-batch-surface`
 - Intermediate stable slice: `b-v0.5-batch-export`
 - Intermediate stable slice: `b-v0.5-history-summary`
-- Current stable continuation slice: narrow `v0.5.x` history browsing / latest-run convenience layer
+- Intermediate stable slice: `b-v0.5-history-browsing`
+- Current stable continuation slice: narrow `v0.5.x` history shortcuts / last-run convenience layer
 - Stable tags:
   - `b-v0.3-baseline`
   - `b-v0.4-baseline`
@@ -20,7 +21,8 @@ This handoff is the canonical resume note for continuing the AI agent runtime ha
   - `b-v0.5-batch-export`
   - `b-v0.5-history-summary`
   - `b-v0.5-history-browsing`
-- Current `HEAD` after closeout: the tagged `b-v0.5-history-browsing` checkpoint commit
+  - `b-v0.5-history-shortcuts`
+- Current `HEAD` after closeout: the tagged `b-v0.5-history-shortcuts` checkpoint commit
 - Working tree expectation after closeout: clean
 - Full-suite verification command:
 
@@ -28,8 +30,8 @@ This handoff is the canonical resume note for continuing the AI agent runtime ha
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-- Expected closeout result: `Ran 238 tests`, `OK`
-- Resume point lineage: this checkpoint is built on top of `b-v0.4-baseline`, `b-v0.5-profile-surface`, `b-v0.5-batch-surface`, `b-v0.5-batch-export`, and `b-v0.5-history-summary`, not as a replacement for any of them
+- Expected closeout result: `Ran 246 tests`, `OK`
+- Resume point lineage: this checkpoint is built on top of `b-v0.4-baseline`, `b-v0.5-profile-surface`, `b-v0.5-batch-surface`, `b-v0.5-batch-export`, `b-v0.5-history-summary`, and `b-v0.5-history-browsing`, not as a replacement for any of them
 
 ## 2. What Has Been Added Since v0.4
 
@@ -224,6 +226,31 @@ Key files:
 - `entrypoints/cli.py`
 - `tests/test_history_browse.py`
 
+### J. History Convenience / Last-Run Shortcuts
+
+Added a thin convenience layer on top of the existing history readers:
+
+- `get_latest_run_id(...)`
+- `get_latest_run_output_dir(...)`
+- `find_run_history_entry(...)`
+- `format_history_brief(...)`
+- CLI history shortcuts:
+  - `history --last-id`
+  - `history --last-output-dir`
+  - `history --run-id <ID>`
+- shortcut lookup rules remain conservative:
+  - latest shortcuts reuse `read_latest_run(...)`
+  - `run_id` lookup uses exact match only
+  - `run_id` lookup prefers existing summary/browse readers and falls back to `run_history.jsonl` when needed
+  - no shortcut writes back to manifest, latest pointer, or summary files
+- append-only truth remains `run_history.jsonl`
+
+Key files:
+
+- `entrypoints/history_browse.py`
+- `entrypoints/cli.py`
+- `tests/test_history_browse.py`
+
 ## 3. What Did NOT Change
 
 These boundaries are still intentionally preserved:
@@ -239,8 +266,10 @@ These boundaries are still intentionally preserved:
 - no batch-driven adaptive replanning or cross-task input mutation was added
 - no database or search system was added
 - no artifact search or filter engine was added
-- browsing helpers only read existing history artifacts and do not become a history state manager
+- no history write-back, replay, or rerun system was added
+- shortcuts layer only reads existing history artifacts and does not become a history state manager
 - append-only truth remains `run_history.jsonl`
+- shortcuts do not write back to latest/summary/manifest files
 
 ## 4. Verification State
 
@@ -252,7 +281,7 @@ python -m unittest discover -s tests -p "test_*.py"
 
 Expected closeout result:
 
-- `Ran 238 tests`
+- `Ran 246 tests`
 - `OK`
 
 Focused tests that cover the `v0.5.x` slice:
@@ -305,10 +334,16 @@ Use `b-v0.5-history-summary` when:
 
 Use `b-v0.5-history-browsing` when:
 
-- you need the current stable `v0.5.x` surface
 - you need manifest-backed run history plus latest-run pointer support
 - you need recent-history summary files and read-only browsing helpers
-- you need CLI `history` convenience commands without moving to HTTP/API serving
+- you want the stable outer surface before last-run shortcuts were added
+
+Use `b-v0.5-history-shortcuts` when:
+
+- you need the current stable `v0.5.x` surface
+- you need manifest-backed run history plus latest-run pointer support
+- you need recent-history summary files, read-only browsing helpers, and direct last-run shortcuts
+- you need CLI `history --last-id`, `history --last-output-dir`, or exact `history --run-id <ID>` lookups without moving to HTTP/API serving
 
 In short:
 
@@ -317,7 +352,8 @@ In short:
 - `b-v0.5-batch-surface` is the stable restore point before export/report artifacts were added
 - `b-v0.5-batch-export` is the stable restore point before history/summary layers were added
 - `b-v0.5-history-summary` is the stable restore point before browsing/convenience commands were added
-- `b-v0.5-history-browsing` is the current stable restore point for profile-aware, batch-capable, export-capable, history-summary-capable, and history-browsing-capable surface work
+- `b-v0.5-history-browsing` is the stable restore point before last-run shortcuts were added
+- `b-v0.5-history-shortcuts` is the current stable restore point for profile-aware, batch-capable, export-capable, history-summary-capable, history-browsing-capable, and history-shortcuts-capable surface work
 
 ## 6. Important Files To Read First
 
@@ -354,17 +390,17 @@ If another agent takes over from this checkpoint, read these first:
 
 ## 7. Recommended Next Step
 
-The next most compatible direction is:
+The next technical decision is:
 
-### `history convenience polish / last-run shortcuts`
+### `stop here as local automation toolchain v1 complete`
 
 Reason:
 
-- the current browsing layer is already stable and read-only
-- last-run shortcuts or slightly more ergonomic convenience polish can still stay in the outer history layer
-- it is a smaller semantic step than introducing an HTTP/API server shell immediately
+- the current local surface is already coherent across single-task, batch, export, manifest, summary, browsing, and shortcut layers
+- the next meaningful expansion is no longer polish inside the same local CLI/toolchain boundary
+- a minimal HTTP/API server shell is feasible, but it would be a larger boundary change and is better treated as a new `v0.6.x` phase rather than as another narrow `v0.5.x` closeout
 
-A minimal HTTP/API server shell is now feasible, but it is still the larger next step and should stay out of this closeout.
+If external process invocation, remote callers, or service-style integration becomes a concrete requirement, then `minimal HTTP/API server shell` is the correct next phase. Until then, this is a valid stopping point.
 
 ## 8. Short Human Summary
 
@@ -381,7 +417,8 @@ It is a controlled outer-surface slice:
 - a thin batch export layer for JSON, JSONL, and Markdown artifacts
 - a thin append-only run history layer
 - a thin history summary and latest-run pointer layer derived from that manifest
-- a thin read-only history browsing and convenience-command layer on top of those history files
+- a thin read-only history browsing layer on top of those history files
+- a thin convenience layer for latest-run shortcuts and exact run-id lookup
 
 The most important operational fact for a new agent is this:
-resume from `b-v0.5-history-browsing` if the work depends on profile-aware input, batch automation, stable export/report artifacts, manifest-derived latest-run/history-summary files, or CLI history browsing; otherwise resume from an earlier stable tag depending on how far back you need to go.
+resume from `b-v0.5-history-shortcuts` if the work depends on profile-aware input, batch automation, stable export/report artifacts, manifest-derived latest-run/history-summary files, CLI history browsing, or direct last-run shortcuts; otherwise resume from an earlier stable tag depending on how far back you need to go.

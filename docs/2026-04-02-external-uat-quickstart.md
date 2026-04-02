@@ -1,114 +1,170 @@
-# 非作者快速验收说明 (v1.2)
+# External UAT Quickstart
 
-日期：2026-04-02
-版本：v1.2 (纠偏修复版)
+Date: 2026-04-02  
+Version: v1.2
 
-这份文档是给第一次接触这个项目的人用的。我们修复了上一轮测试中出现的 Windows 兼容性与超时问题。
+This document is for public alpha testers who want to verify the core archive loop with the smallest possible setup cost.
 
-目标：确认你能不能在**不依赖作者口头解释**的情况下，独立把最小诊断流程跑通。
+The goal is not to understand the whole architecture first. The goal is to finish one real loop:
 
----
-
-## ⚠️ 重要：环境预警
-如果你的项目文件夹位于 **百度网盘同步空间、OneDrive 或 iCloud** 等同步盘目录下，由于 Windows 的文件锁定机制，可能会导致运行超时（>120s）。请尽量在**非同步盘**的本地目录下进行测试。
+`inspect-state -> run -> archive --latest -> compare`
 
 ---
 
-## 你需要做什么
+## Before You Start
 
-请按顺序执行下面 6 步。
+### Recommended Environment
 
-### 0. 准备环境 (前置步骤)
+- Windows PowerShell or CMD
+- Python `3.13.2`
+- Repository cloned locally
 
-请确保你已经安装了必要的依赖。
+### Dependency Note
 
-```bash
-pip install -r requirements-v0.1.txt
-```
+Current baseline runtime dependencies: **none**  
+There is no required third-party package install for the current baseline.
 
-### 0.1 路径自检 (必做)
+### Important First-Impression Advice
 
-在运行正式任务前，请先确认你的 `PYTHONPATH` 设置正确且模块可识别。
+For the first try:
 
-**Windows PowerShell (推荐):**
+- do not start by reading the full raw `run` JSON
+- start with `archive --latest`
+- treat the test as "Can I understand what happened?" rather than "Can I make it look impressive?"
+
+---
+
+## Step 1: Inspect State
+
+### PowerShell
+
 ```powershell
-$env:PYTHONPATH="."; python -m entrypoints.cli inspect-state
+$env:PYTHONPATH="."
+python -m entrypoints.cli inspect-state
 ```
 
-**Windows CMD:**
+### CMD
+
 ```cmd
-set PYTHONPATH=. & python -m entrypoints.cli inspect-state
+set PYTHONPATH=.
+python -m entrypoints.cli inspect-state
 ```
 
-**Expected Outcome**: 看到打印出项目结构信息且无报错，即说明路径闭环。
+### Expected Result
+
+The command should return a normal state summary without throwing import or path errors.
 
 ---
 
-### 1. 跑一个“极简验证任务” (Ping)
+## Step 2: Run a Minimal Task
 
-为了排除网络和逻辑干扰，请先跑一个秒级返回的极简任务。
+### PowerShell
 
-**Windows PowerShell:**
 ```powershell
-$env:PYTHONPATH="."; python -m entrypoints.cli run --task "ping" --task-type retrieval
+$env:PYTHONPATH="."
+python -m entrypoints.cli run --task "ping" --task-type retrieval
 ```
 
-**Expected Outcome**: 在 10 秒内看到 JSON 响应，且包含 `"status": "success"`。如果这一步超时，请检查你的杀毒软件或磁盘 IO。
+### CMD
+
+```cmd
+set PYTHONPATH=.
+python -m entrypoints.cli run --task "ping" --task-type retrieval
+```
+
+### Expected Result
+
+You should see:
+
+- `"status": "success"`
+- a newly generated `run_id`
+- a normal JSON response instead of a crash
 
 ---
 
-### 2. 看最新归档 (Archive)
-
-确认任务跑完后，查看刚才生成的归档摘要。
+## Step 3: Read the Latest Archive
 
 ```bash
 python -m entrypoints.cli archive --latest
 ```
 
+### What To Look For
+
+- Can you quickly understand what this run was?
+- Can you find the `run_id`, task type, and key output summary?
+- Does the archive summary feel easier to read than the raw `run` JSON?
+
 ---
 
-### 3. 查看归档列表与过滤
+## Step 4: Browse by Filter
 
-尝试查看最近的失败任务或特定类型的任务。
+Try one or both of these:
 
 ```bash
-# 查看最近 10 条失败的任务
-python -m entrypoints.cli archive --status failed --limit 10
-
-# 查看最近 10 条检索类任务
 python -m entrypoints.cli archive --task-type retrieval --limit 10
+python -m entrypoints.cli archive --status failed --limit 10
 ```
+
+### What To Look For
+
+- Can you find the run you want without opening raw files?
+- Do the filters feel understandable?
 
 ---
 
-### 4. 进行两次运行对比 (Compare)
+## Step 5: Compare Two Runs
 
-你可以选取上面跑出来的 run-id，或者使用下面的基准 ID 进行对比。
-注意：**`--compare-run-id` 参数必须重复输入两次**。
-
-**基准 ID（兵部提供）：**
-- 成功场景: `20260402T083943Z_search_docs_for_runtime_context_90c557`
-- 异常场景: `20260402T065322Z_design_a_runtime_harness_plan_e25af2`
+Pick two real run ids and compare them:
 
 ```bash
 python -m entrypoints.cli archive --compare-run-id <id_1> --compare-run-id <id_2>
 ```
 
----
+### What To Look For
 
-## 你需要回答的问题
-
-完成后，请将反馈填入 `tests/uat_results/feedback/` 目录下你的反馈表中：
-
-1. 哪一步你最容易卡住？（安装、PYTHONPATH、ping 任务、寻找 id？）
-2. 哪个输出你完全看不懂？（指出具体字段名）
-3. 你能不能快速判断哪条 run 最值得先看？
-4. compare 输出有没有真正帮助你理解差异？
-5. 如果让你明天再用一次，你还记得怎么用吗？
+- Can you tell why one run is better or worse?
+- Does the compare output help you make a diagnosis faster?
+- Would you use this instead of manually reading two raw outputs?
 
 ---
 
-## 验收标准
+## What We Actually Want Feedback On
 
-- **通过**：不用作者解释，能完成上述 5 步（含 ping），能看懂关键字段。
-- **未通过**：需要作者解释字段含义，或在执行 ping 任务时依然因环境问题彻底卡死。
+The most useful feedback is not "this is cool."
+
+Please focus on these questions:
+
+1. Where did you get stuck?
+2. Which command or output was confusing?
+3. Did `archive --latest` help more than raw `run` output?
+4. Did `compare` actually help you reason about differences?
+5. If this were part of your workflow, what would still block real use?
+
+---
+
+## Pass Criteria
+
+A tester can be counted as "basic pass" if they can do all of the following:
+
+- run `inspect-state`
+- run the `ping` task successfully
+- open `archive --latest`
+- understand what happened without reading every raw artifact file
+
+An "extended pass" means they can also:
+
+- browse filtered runs
+- compare two runs
+- explain which output is more useful and why
+
+---
+
+## Known Current Friction
+
+Based on the current UAT evidence, the main friction points are:
+
+- first-run shell differences between PowerShell and CMD
+- users paying too much attention to raw `run` JSON at the start
+- onboarding still being more technical than it should be
+
+The archive logic itself is not the main problem at this stage. The main problem is first-run clarity.

@@ -1,235 +1,236 @@
-﻿# archive-first-harness
+# archive-first-harness
 
-English | [简体中文](README.zh-CN.md)
+<div align="center">
 
-A diagnostic-first runtime harness for AI agents.
+**An archive-first runtime harness for AI agents that need to be diagnosable, comparable, and governable.**
 
-This project is built for one core purpose: turning AI agent execution from a demo-style black box into an inspectable, comparable, and governable engineering system.
+[![Python](https://img.shields.io/badge/python-3.13.2-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![Stage](https://img.shields.io/badge/stage-public%20alpha-1f6feb)](#current-status)
+[![Focus](https://img.shields.io/badge/focus-archive--first-111111)](#why-this-project-exists)
+[![Tests](https://img.shields.io/badge/tests-291%20passed-brightgreen)](#validation)
 
-It is intentionally narrow. It is not trying to be a full agent platform yet. Instead, it focuses on a stable runtime core plus an archive-first evidence layer that makes runs easier to inspect, compare, and improve over time.
+[**中文文档**](README.zh-CN.md) | [English](README.md)
+
+[Quick Start](#quick-start) • [Why This Project Exists](#why-this-project-exists) • [What Makes It Different](#what-makes-it-different) • [Architecture](#architecture) • [Validation](#validation) • [Roadmap](#roadmap)
+
+</div>
+
+---
+
+## What This Is
+
+`archive-first-harness` is not trying to be a full AI agent platform on day one.
+
+It is a deliberately narrow runtime harness built around one hard engineering question:
+
+**when an agent run succeeds, fails, or regresses, can you explain why with evidence instead of intuition?**
+
+The current answer is an archive-first execution model:
+
+- keep the runtime chain conservative
+- persist structured evidence for every run
+- make runs readable and comparable after the fact
+- improve the system through diagnostics instead of demo impressions
+
+If you care more about repeatability, verification, and run-level evidence than about surface-level autonomy, this is the problem this repository is solving.
 
 ## Why This Project Exists
 
-Most AI agent systems share the same weakness:
+Many agent systems can look impressive in a demo but become hard to reason about in real work.
 
-- they can look impressive in demos
-- they can appear highly capable on a single run
-- but once they fail in real work, it becomes hard to answer simple questions
+Typical questions are surprisingly hard to answer:
 
-For example:
+| Question | Why it matters |
+|---|---|
+| Why did this run fail? | Failure without localization is not actionable. |
+| Where did it fail? | You need to know whether the issue was routing, execution, verification, or governance. |
+| Why is this run worse than the previous one? | Without comparison, optimization becomes guesswork. |
+| Did the run actually produce the expected artifact? | "Looks successful" is not enough. |
+| What should be changed next? | Improvement needs evidence, not vibes. |
 
-- Why did this run fail?
-- Where exactly did it fail?
-- Why is this run worse than the previous one?
-- Did the run actually produce the expected artifact?
-- Is the issue in the model, the tool call, the contract, the verification layer, or governance?
+This repository exists to make those questions answerable.
 
-This repository exists to solve that class of problem.
+## What Makes It Different
 
-## Core Value Proposition
+### 1. Archive-first, not demo-first
 
-This project is differentiated by engineering discipline, not surface feature count.
+Each run is treated as an engineering event that should remain inspectable after execution.
 
-### 1. Diagnostic-first, not demo-first
+### 2. Diagnostic evidence is a first-class output
 
-Every run is treated as something that should be explainable after the fact, not just something that should look smart in the moment.
+Runs can persist structured files under `artifacts/runs/<run_id>/`, including:
 
-### 2. Archive-first evidence layer
+- `manifest.json`
+- `verification_report.json`
+- `failure_signature.json`
+- `execution_trace.jsonl`
+- `final_output.json`
 
-Each run can persist structured evidence under `artifacts/runs/<run_id>/`, including contract, verification, evaluation, failure signature, and execution trace data.
+### 3. It supports a practical comparison loop
 
-### 3. Stable comparison loop
-
-The practical loop is:
+The current working loop is:
 
 `run -> latest -> browse -> run-id -> compare`
 
-This makes it possible to reason about regressions and improvements across runs without manually digging through raw JSON.
+That loop is much more useful in practice than reading raw JSON and guessing what changed.
 
-### 4. Conservative runtime core
+### 4. The runtime core stays conservative
 
-The runtime remains intentionally single-path and advisory-first. It does not allow comparison or evaluation layers to silently become a control plane.
+The project does not let evaluation or comparison silently turn into an opaque control plane. The execution path remains intentionally narrow and diagnosable.
 
-### 5. Built for iterative hardening
+### 5. Scope is intentionally constrained
 
-The goal is not to expand the boundary too early. The goal is to build a reliable substrate first, then expand with evidence.
+This repository is delaying platform expansion on purpose. No database layer, no async worker system, no plugin marketplace, no premature multi-agent orchestration.
 
-## Current Architecture
+## Architecture
 
-The current boundary is deliberately simple and stable:
+The current architecture is organized around a stable runtime core plus an evidence layer.
 
-- `entrypoints/`: CLI surface, task runner, batch runner, history helpers, archive helpers
-- `runtime/`: orchestrator, executor, verifier, model routing, methodology routing
-- `harness/`: contracts, state, context, tools, hooks, journal, sandbox, telemetry, evaluation
-- `planner/`: task contract and planning helpers
-- `tests/`: focused unit, smoke, archive, history, and integration tests
+| Layer | Responsibility |
+|---|---|
+| `entrypoints/` | CLI surface, task runner, batch runner, history helpers, archive helpers |
+| `runtime/` | Orchestrator, executor, verifier, routing, governance handoff |
+| `harness/` | State, contracts, context, tools, journal, telemetry, evaluation plumbing |
+| `planner/` | Task-contract and planning helpers |
+| `tests/` | Unit, smoke, archive, history, and integration coverage |
 
 ### Runtime Flow
 
-`surface request / CLI -> profile_input_adapter -> task contract -> state manager -> context engine -> execution -> verification -> residual follow-up -> governance -> conditional sandbox -> rollback when needed -> journal append -> telemetry/metrics -> evaluation input bundle -> baseline compare / realm evaluator`
+`request -> input normalization -> task contract -> state/context -> execution -> verification -> governance -> rollback when needed -> journal -> telemetry -> evaluation inputs`
 
 ### Archive Flow
 
-`run -> write_run_archive(...) -> artifacts/runs/<run_id>/ -> archive --latest / --run-id / browse filters / --compare-run-id`
+`run -> write_run_archive(...) -> artifacts/runs/<run_id>/ -> archive --latest / --run-id / --compare-run-id`
 
-## Technology Direction
+### Design Principle
 
-This project follows a staged technical strategy.
-
-### Stage 1: Stabilize the runtime core
-
-- keep the execution chain narrow
-- keep responsibilities explicit
-- keep failures diagnosable
-
-### Stage 2: Build the archive evidence layer
-
-- persist per-run artifacts
-- make runs readable and comparable
-- reduce regression diagnosis time
-
-### Stage 3: Validate with real usage
-
-- external UAT
-- repeated real usage diaries
-- hard acceptance checklist instead of subjective progress percentages
-
-### Deferred on purpose
-
-The following are intentionally deferred until the archive loop is proven in real work:
-
-- HTTP / API server layer
-- database-backed search or query DSL
-- async queue / worker infrastructure
-- plugin ecosystem
-- replay / rerun orchestration
-- large-scale multi-agent runtime expansion
+The system is trying to become a reliable substrate first, not a large platform first.
 
 ## Current Status
 
-This repository is currently at an alpha-stage validation phase.
+This repository is in **public alpha**.
 
-### What is already working
+What is already working:
 
 - profile-aware task input normalization
-- single-task surface via CLI and programmatic entrypoints
-- sequential batch surface
-- batch export artifacts
-- append-only run history and latest-run shortcuts
-- archive-first per-run diagnostic persistence
-- archive browsing and comparison
+- single-task CLI execution
+- sequential batch execution
+- append-only history and latest-run lookup
+- archive writing for per-run evidence
+- archive browsing by latest run or specific run id
+- run-to-run comparison for diagnostic review
 
-### What has been validated
+What is intentionally not done yet:
 
-- real archive smoke flow across success, failure, governance-review, and coding-artifact scenarios
-- full local test suite passing
-- Windows-oriented CLI/UAT prep and shell-specific startup guidance
+- hosted API service
+- database-backed search
+- async queue or worker layer
+- plugin ecosystem
+- large-scale multi-agent coordination
 
-### Verified results
+## Validation
 
-- Full test suite: `291` tests passed locally
-- Archive smoke loop validated on real runs
-- `archive --latest`, `archive --run-id`, and `archive --compare-run-id` all exercised on real diagnostic cases
+The current build is not just documented; it has been exercised.
 
-## Strengths
+### Verified Results
 
-Why this project may be useful to serious builders:
+- Local full test suite: `291` tests passed
+- Real smoke flow validated across success, failure, governance-review, and coding-artifact scenarios
+- `archive --latest`, `archive --run-id`, and `archive --compare-run-id` all verified on real runs
+- External UAT showed the main friction is first-run shell entry, not the archive logic itself
 
-- It optimizes for explainability of runs, not only run completion
-- It treats verification and governance as first-class concerns
-- It makes artifact-level differences visible
-- It is easier to reason about than larger systems that over-expand too early
-- It creates a path toward future multi-agent coordination without starting with uncontrolled complexity
+### UAT Takeaway
 
-## Known Limitations
+The most important finding so far is simple:
 
-Current known issues and limitations:
+**the archive loop is already useful, but the first-run experience still needs polishing.**
 
-- external UAT is still limited; usability is not yet broadly validated
-- first-run setup on Windows requires shell-specific instructions
-- raw `run` JSON is still heavier than ideal for first-time users
-- the archive contract currently writes many files per run; signal-to-noise ratio still needs more validation through repeated use
-- this is not yet a hosted product or production platform
+That is a good alpha-stage problem. It means the bottleneck is onboarding clarity rather than complete architectural failure.
 
 ## Quick Start
 
-### Windows PowerShell
+### Environment
+
+- Recommended: Python `3.13.2`
+- Current baseline runtime dependencies: **none**
+- Current testing focus: Windows PowerShell and CMD
+
+### Clone
+
+```bash
+git clone https://github.com/quzhiii/archive-first-harness.git
+cd archive-first-harness
+```
+
+### PowerShell
 
 ```powershell
-$env:PYTHONPATH="."; python -m entrypoints.cli inspect-state
-$env:PYTHONPATH="."; python -m entrypoints.cli run --task "ping" --task-type retrieval
+$env:PYTHONPATH="."
+python -m entrypoints.cli inspect-state
+python -m entrypoints.cli run --task "ping" --task-type retrieval
 python -m entrypoints.cli archive --latest
 ```
 
-### Windows CMD
+### CMD
 
 ```cmd
-set PYTHONPATH=. & python -m entrypoints.cli inspect-state
-set PYTHONPATH=. & python -m entrypoints.cli run --task "ping" --task-type retrieval
+set PYTHONPATH=.
+python -m entrypoints.cli inspect-state
+python -m entrypoints.cli run --task "ping" --task-type retrieval
 python -m entrypoints.cli archive --latest
 ```
 
-### Expected first-run outcome
+### Expected First Run
 
 For the `ping` task, you should see:
 
-- a successful JSON result from `run`
+- a successful `run` result
 - a new `run_id`
-- a readable latest archive summary from `archive --latest`
+- a readable archive summary from `archive --latest`
 
-Important: for first-time evaluation, do not spend time reading the full raw `run` JSON. Start with `archive --latest` first.
-
-## Recommended Read Order
-
-If you are evaluating the repository seriously, read these files in order:
-
-1. `README.md`
-2. `README.zh-CN.md`
-3. `PROJECT_ARCHITECTURE_STATUS_AND_ROADMAP.md`
-4. `docs/2026-04-02-archive-real-dev-smoke-test.md`
-5. `docs/2026-04-02-external-uat-quickstart.md`
-6. `docs/2026-04-02-m3-hard-acceptance-checklist.md`
+For first-time evaluation, start with `archive --latest` instead of the full raw `run` output.
 
 ## Who This Is For
 
-This repository is best suited for:
+This project is a fit for:
 
 - builders working on AI agent runtime quality
 - developers who care about regression diagnosis
 - teams that want run-level evidence before expanding architecture
-- people exploring how to make AI agent systems more inspectable and governable
+- researchers exploring diagnosable and governable agent systems
 
-It is not yet aimed at casual end users.
+It is not yet aimed at casual end users or production deployment teams.
+
+## Documentation Map
+
+Start here if you want the deeper project context:
+
+- [Project Architecture, Status, and Roadmap](PROJECT_ARCHITECTURE_STATUS_AND_ROADMAP.md)
+- [Archive Real Dev Smoke Test](docs/2026-04-02-archive-real-dev-smoke-test.md)
+- [External UAT Quickstart](docs/2026-04-02-external-uat-quickstart.md)
+- [M3 Hard Acceptance Checklist](docs/2026-04-02-m3-hard-acceptance-checklist.md)
+- [Real Usage Diary Template](docs/2026-04-02-real-usage-diary-template.md)
+- [Background and Paradigm Notes](docs/background/README.md)
 
 ## Roadmap
 
-Near-term focus:
+Near-term priorities are concrete:
 
-1. improve first-run usability
-2. complete external UAT with real users
-3. accumulate real usage diary evidence
-4. improve archive signal-to-noise ratio
-5. validate repeated-run stability before boundary expansion
+1. reduce first-run friction for external testers
+2. collect more public alpha usage feedback
+3. improve archive signal-to-noise ratio
+4. accumulate real usage diaries instead of more architectural speculation
+5. hold the runtime boundary steady until repeated use proves the archive loop
 
-## Testing & Validation Materials
+## Public Alpha Note
 
-Relevant documents:
+If you test this repository, the most valuable feedback is not "looks cool."
 
-- `tests/uat_results/observation_logs/2026-04-02-pre-check-report.md`
-- `tests/uat_results/observation_logs/2026-04-02-uat-observation-summary.md`
-- `tests/uat_results/reports/2026-04-02-cli-cross-platform-compatibility.md`
-- `docs/2026-04-02-archive-real-dev-smoke-test.md`
-- `docs/2026-04-02-m3-hard-acceptance-checklist.md`
-
-## Alpha Notice
-
-This is an alpha-stage engineering repository.
-
-If you want to test it, the most useful feedback is not “this looks cool,” but concrete observations such as:
+The best feedback is:
 
 - where you got stuck
-- which field names were confusing
-- whether `compare` changed your diagnosis or decision
-- whether the archive output saved time
+- what output felt confusing
+- whether `compare` changed your diagnosis
+- whether archive browsing actually saved time
 
-That kind of feedback is what this repository is designed to turn into real improvements.
+That is the feedback loop this project is built around.

@@ -1,11 +1,14 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from entrypoints.run_archive import write_run_archive
+from entrypoints.run_history import build_run_id
 from entrypoints.settings import Settings
 from harness.contracts.profile_input_adapter import (
     ProfileInputResolution,
@@ -66,11 +69,22 @@ def run_task_request(
     executor: Executor | None = None,
     orchestrator: Orchestrator | None = None,
 ) -> dict[str, Any]:
+    created_at = datetime.now(UTC)
     surface_request = _coerce_surface_task_request(request)
     profile_resolution = resolve_surface_workflow_profile(
         surface_request.profile_payload(),
         task_type=surface_request.task_type,
     )
+    trace_events: list[dict[str, Any]] = [
+        {
+            "timestamp": _timestamp_now(),
+            "event_type": "surface_request_received",
+            "status": "ok",
+            "metadata": {
+                "task_type": surface_request.task_type or "",
+            },
+        }
+    ]
 
     artifacts_dir = settings.artifacts_dir
     state_dir = artifacts_dir / "state"
@@ -86,6 +100,18 @@ def run_task_request(
     task_contract = TaskContractBuilder().build(
         surface_request.task,
         constraints=builder_constraints,
+    )
+    trace_events.append(
+        {
+            "timestamp": _timestamp_now(),
+            "event_type": "task_contract_built",
+            "status": "ok",
+            "metadata": {
+                "task_id": task_contract.task_id,
+                "contract_id": task_contract.contract_id,
+                "workflow_profile_id": task_contract.workflow_profile_id,
+            },
+        }
     )
     _write_json(contracts_dir / "latest_contract.json", _to_json_value(task_contract))
 
@@ -116,12 +142,91 @@ def run_task_request(
     )
 
     output = dict(result)
-    output["surface"] = {
+    surface_payload = {
         "workflow_profile_id": profile_resolution.workflow_profile_id,
         "profile_resolution": profile_resolution.as_dict(),
     }
+    archive_surface_payload = {
+        "task": surface_request.task,
+        "task_type": surface_request.task_type,
+        **surface_payload,
+    }
+    output["surface"] = surface_payload
     output.setdefault("telemetry", output.get("metrics_summary"))
     output.setdefault("evaluation", output.get("realm_evaluation"))
+
+    execution_result = output.get("execution_result")
+    if isinstance(execution_result, Mapping):
+        trace_events.append(
+            {
+                "timestamp": _timestamp_now(),
+                "event_type": "runtime_completed",
+                "status": str(execution_result.get("status") or "unknown"),
+                "metadata": {
+                    "tool_name": str(execution_result.get("tool_name") or ""),
+                    "sandboxed": bool(execution_result.get("metadata", {}).get("sandboxed")) if isinstance(execution_result.get("metadata"), Mapping) else False,
+                },
+            }
+        )
+    verification_report = output.get("verification_report")
+    if isinstance(verification_report, Mapping):
+        trace_events.append(
+            {
+                "timestamp": _timestamp_now(),
+                "event_type": "verification_completed",
+                "status": "passed" if bool(verification_report.get("passed")) else "failed",
+                "metadata": {
+                    "verification_status": str(verification_report.get("status") or "unknown"),
+                },
+            }
+        )
+    residual_followup = output.get("residual_followup")
+    if isinstance(residual_followup, Mapping):
+        governance = residual_followup.get("governance") if isinstance(residual_followup.get("governance"), Mapping) else None
+        trace_events.append(
+            {
+                "timestamp": _timestamp_now(),
+                "event_type": "governance_completed",
+                "status": str(governance.get("status") or "clear") if isinstance(governance, Mapping) else "clear",
+                "metadata": {
+                    "governance_required": bool(governance.get("requires_governance_override")) if isinstance(governance, Mapping) else False,
+                },
+            }
+        )
+    realm_evaluation = output.get("realm_evaluation")
+    if isinstance(realm_evaluation, Mapping):
+        trace_events.append(
+            {
+                "timestamp": _timestamp_now(),
+                "event_type": "evaluation_completed",
+                "status": str(realm_evaluation.get("status") or "unknown"),
+                "metadata": {
+                    "requires_human_review": bool(realm_evaluation.get("requires_human_review")),
+                },
+            }
+        )
+
+    run_id = build_run_id(surface_request.task, created_at=created_at)
+    try:
+        archive_result = write_run_archive(
+            archive_root=artifacts_dir / "runs",
+            run_id=run_id,
+            created_at=created_at,
+            surface_request=surface_payload,
+            run_result=output,
+            formation_id="default",
+            policy_mode="default",
+            trace_events=trace_events,
+        )
+    except Exception as exc:
+        output["run_archive"] = {
+            "status": "failed",
+            "run_id": run_id,
+            "error_type": type(exc).__name__,
+            "message": str(exc),
+        }
+    else:
+        output["run_archive"] = archive_result
     return output
 
 
@@ -194,6 +299,9 @@ def _build_builder_constraints(
 
 
 
+def _timestamp_now() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
 def _normalize_required_string(value: object | None) -> str:
     text = _normalize_optional_string(value)
     return text or ""
@@ -250,3 +358,8 @@ def _to_json_value(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [_to_json_value(item) for item in value]
     return value
+
+
+
+
+

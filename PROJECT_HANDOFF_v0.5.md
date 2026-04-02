@@ -1,6 +1,6 @@
 ﻿# PROJECT_HANDOFF_v0.5
 
-This handoff is the canonical resume note for continuing the AI agent runtime harness from the narrow `v0.5.x` history shortcuts checkpoint in a new chat, a new model, or another coding agent such as Claude Code or OpenCode.
+This handoff is the canonical resume note for continuing the AI agent runtime harness from the narrow `v0.5.x` history shortcuts checkpoint plus the current untagged archive-first diagnostic layer in a new chat, a new model, or another coding agent such as Claude Code or OpenCode.
 
 ## 1. Current Snapshot
 
@@ -13,6 +13,7 @@ This handoff is the canonical resume note for continuing the AI agent runtime ha
 - Intermediate stable slice: `b-v0.5-history-summary`
 - Intermediate stable slice: `b-v0.5-history-browsing`
 - Current stable continuation slice: narrow `v0.5.x` history shortcuts / last-run convenience layer
+- Current working-tree extension: archive-first run diagnostic layer for single-task runs
 - Stable tags:
   - `b-v0.3-baseline`
   - `b-v0.4-baseline`
@@ -30,7 +31,7 @@ This handoff is the canonical resume note for continuing the AI agent runtime ha
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-- Expected closeout result: `Ran 246 tests`, `OK`
+- Current working-tree verification result: `Ran 253 tests`, `OK`
 - Resume point lineage: this checkpoint is built on top of `b-v0.4-baseline`, `b-v0.5-profile-surface`, `b-v0.5-batch-surface`, `b-v0.5-batch-export`, `b-v0.5-history-summary`, and `b-v0.5-history-browsing`, not as a replacement for any of them
 
 ## 2. What Has Been Added Since v0.4
@@ -251,6 +252,25 @@ Key files:
 - `entrypoints/cli.py`
 - `tests/test_history_browse.py`
 
+### K. Archive-First Run Diagnostic Layer
+
+Added a thin best-effort single-run archive layer on top of the existing surface without changing runtime control semantics:
+
+- `write_run_archive(...)`
+- per-run archive directories under `artifacts/runs/<run_id>/`
+- `manifest.json`, `task_contract.json`, `profile_and_mode.json`, `verification_report.json`, `metrics_summary.json`, `evaluation_summary.json`, `final_output.json`
+- minimum raw evidence via `context_plan.json`, `execution_trace.jsonl`, and `failure_signature.json`
+- append-only `artifacts/runs/index.jsonl`
+- non-fatal archive write handling through `result["run_archive"]`
+
+Key files:
+
+- `entrypoints/run_archive.py`
+- `entrypoints/task_runner.py`
+- `tests/test_run_archive_writer.py`
+- `tests/test_run_archive_failure_tolerance.py`
+- `tests/test_run_archive_trace.py`
+- `tests/test_run_archive_index.py`
 ## 3. What Did NOT Change
 
 These boundaries are still intentionally preserved:
@@ -392,15 +412,22 @@ If another agent takes over from this checkpoint, read these first:
 
 The next technical decision is:
 
-### `stop here as local automation toolchain v1 complete`
+### `start the archive-first diagnostic layer`
 
 Reason:
 
 - the current local surface is already coherent across single-task, batch, export, manifest, summary, browsing, and shortcut layers
-- the next meaningful expansion is no longer polish inside the same local CLI/toolchain boundary
-- a minimal HTTP/API server shell is feasible, but it would be a larger boundary change and is better treated as a new `v0.6.x` phase rather than as another narrow `v0.5.x` closeout
+- the highest-value missing layer is now run-level diagnostic evidence, not another external surface
+- a minimal HTTP/API server shell is still feasible later, but it is now a downstream boundary expansion, not the immediate next step
 
-If external process invocation, remote callers, or service-style integration becomes a concrete requirement, then `minimal HTTP/API server shell` is the correct next phase. Until then, this is a valid stopping point.
+The recommended immediate scope is:
+
+- add `artifacts/runs/<run_id>/` as a thin run archive
+- persist existing structured outputs per run
+- retain minimum raw evidence such as context plan, execution trace, and failure signature
+- add a thin append-only archive index
+
+This should be done without changing `runtime/orchestrator.py` control semantics and without introducing HTTP/API serving, database-backed search, or a full formation engine.
 
 ## 8. Short Human Summary
 
@@ -419,6 +446,10 @@ It is a controlled outer-surface slice:
 - a thin history summary and latest-run pointer layer derived from that manifest
 - a thin read-only history browsing layer on top of those history files
 - a thin convenience layer for latest-run shortcuts and exact run-id lookup
+- a thin archive-first diagnostic layer for single-task runs with per-run evidence and append-only archive indexing
 
 The most important operational fact for a new agent is this:
 resume from `b-v0.5-history-shortcuts` if the work depends on profile-aware input, batch automation, stable export/report artifacts, manifest-derived latest-run/history-summary files, CLI history browsing, or direct last-run shortcuts; otherwise resume from an earlier stable tag depending on how far back you need to go.
+
+
+

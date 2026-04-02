@@ -882,7 +882,7 @@ class Orchestrator:
             "research": ("search_docs", "read_file"),
             "generation": ("search_docs", "read_file"),
             "planning": ("search_docs", "read_file"),
-            "coding": ("read_file", "run_command", "write_file"),
+            "coding": ("write_file", "run_command", "read_file"),
             "review": ("read_file", "search_docs"),
             "qa": ("run_command", "read_file"),
             "execution": ("run_command", "write_file", "read_file"),

@@ -1,223 +1,235 @@
-﻿# AI Agent Runtime Harness
+﻿# archive-first-harness
 
-This repository contains a staged implementation skeleton for an AI agent runtime harness.
-It remains intentionally narrow: the main path is runnable, inspectable, and easy to compare across versions.
-It is not a full agent platform.
+English | [简体中文](README.zh-CN.md)
 
-## Current Stable Slice
+A diagnostic-first runtime harness for AI agents.
 
-The frozen baseline is still `B v0.4` via `b-v0.4-baseline`.
-On top of that baseline, the current stable recovery slice is a narrow `v0.5.x` layer focused on profile semantics, sequential batch execution, stable export artifacts, manifest-derived history files, read-only history browsing, and direct history shortcuts.
+This project is built for one core purpose: turning AI agent execution from a demo-style black box into an inspectable, comparable, and governable engineering system.
 
-The current `v0.5.x` slice adds:
+It is intentionally narrow. It is not trying to be a full agent platform yet. Instead, it focuses on a stable runtime core plus an archive-first evidence layer that makes runs easier to inspect, compare, and improve over time.
 
-- `WorkflowProfile` with a default profile and a small set of built-in profiles
-- `workflow_profile_id` carried through `TaskContract` and summarized into evaluator input
-- shared profile-aware interpretation metadata for `BaselineComparator` and `RealmEvaluator`
-- `profile_input_adapter` with fixed precedence and fallback rules
-- `SurfaceTaskRequest` and `run_task_request(...)` as a thin external request surface
-- `SurfaceBatchRequest`, `run_batch_request(...)`, and `load_batch_request_file(...)` as a thin sequential batch surface
-- `BatchExportOptions` and `export_batch_results(...)` as a thin export layer for batch artifacts
-- `RunHistoryEntry`, `append_run_history_entry(...)`, and `list_run_history(...)` as an append-only export history manifest layer
-- `RunHistorySummaryEntry`, `write_latest_run_pointer(...)`, and `write_run_history_summary(...)` as a thin latest-run pointer and recent-history summary layer
-- `read_latest_run(...)`, `read_run_history_summary(...)`, and `browse_run_history(...)` as a thin read-only history browsing layer
-- `get_latest_run_id(...)`, `get_latest_run_output_dir(...)`, `find_run_history_entry(...)`, and `format_history_brief(...)` as a thin last-run shortcut layer
-- a thin CLI surface that forwards batch execution, export, history writing, summary writing, browsing, and history shortcuts through the same outer entry path
+## Why This Project Exists
 
-This is still a conservative runtime harness. It does not implement HTTP serving, async workers, queue orchestration, auto-execution governance, or rich memory systems.
+Most AI agent systems share the same weakness:
 
-## Current Runtime Chain
+- they can look impressive in demos
+- they can appear highly capable on a single run
+- but once they fail in real work, it becomes hard to answer simple questions
 
-The current execution and evaluation chain is still single-path inside the runtime:
+For example:
+
+- Why did this run fail?
+- Where exactly did it fail?
+- Why is this run worse than the previous one?
+- Did the run actually produce the expected artifact?
+- Is the issue in the model, the tool call, the contract, the verification layer, or governance?
+
+This repository exists to solve that class of problem.
+
+## Core Value Proposition
+
+This project is differentiated by engineering discipline, not surface feature count.
+
+### 1. Diagnostic-first, not demo-first
+
+Every run is treated as something that should be explainable after the fact, not just something that should look smart in the moment.
+
+### 2. Archive-first evidence layer
+
+Each run can persist structured evidence under `artifacts/runs/<run_id>/`, including contract, verification, evaluation, failure signature, and execution trace data.
+
+### 3. Stable comparison loop
+
+The practical loop is:
+
+`run -> latest -> browse -> run-id -> compare`
+
+This makes it possible to reason about regressions and improvements across runs without manually digging through raw JSON.
+
+### 4. Conservative runtime core
+
+The runtime remains intentionally single-path and advisory-first. It does not allow comparison or evaluation layers to silently become a control plane.
+
+### 5. Built for iterative hardening
+
+The goal is not to expand the boundary too early. The goal is to build a reliable substrate first, then expand with evidence.
+
+## Current Architecture
+
+The current boundary is deliberately simple and stable:
+
+- `entrypoints/`: CLI surface, task runner, batch runner, history helpers, archive helpers
+- `runtime/`: orchestrator, executor, verifier, model routing, methodology routing
+- `harness/`: contracts, state, context, tools, hooks, journal, sandbox, telemetry, evaluation
+- `planner/`: task contract and planning helpers
+- `tests/`: focused unit, smoke, archive, history, and integration tests
+
+### Runtime Flow
 
 `surface request / CLI -> profile_input_adapter -> task contract -> state manager -> context engine -> execution -> verification -> residual follow-up -> governance -> conditional sandbox -> rollback when needed -> journal append -> telemetry/metrics -> evaluation input bundle -> baseline compare / realm evaluator`
 
-The current batch, export, and history path is only a thin outer layer:
+### Archive Flow
 
-`batch request / --batch-file -> SurfaceBatchRequest -> run_batch_request(...) -> repeated run_task_request(...) -> export_batch_results(...) -> append_run_history_entry(...) -> write_latest_run_pointer(...) / write_run_history_summary(...) -> read_latest_run(...) / read_run_history_summary(...) / browse_run_history(...) -> get_latest_run_id(...) / get_latest_run_output_dir(...) / find_run_history_entry(...)`
+`run -> write_run_archive(...) -> artifacts/runs/<run_id>/ -> archive --latest / --run-id / browse filters / --compare-run-id`
 
-The chain remains deliberately advisory-only.
+## Technology Direction
 
-## Current Directory Shape
+This project follows a staged technical strategy.
 
-- `entrypoints/`: thin CLI, settings loader, single-task runner, minimal batch runner surface, batch export helper, run history manifest helper, history summary helper, and history browse/shortcut helper
-- `planner/`: task contract builder and interviewer
-- `runtime/`: orchestrator, executor, verifier, model router, methodology router
-- `harness/contracts/`: workflow profiles and profile input normalization
-- `harness/state/`: state models and state manager
-- `harness/context/`: working context assembly
-- `harness/tools/`: minimal tool discovery registry
-- `harness/hooks/`: synchronous local hook orchestrator and payload contracts
-- `harness/journal/`: minimal cross-task learning journal
-- `harness/sandbox/`: stub isolation and rollback abstractions
-- `harness/telemetry/`: local tracing and metrics aggregation
-- `harness/evaluation/`: baseline compare, evaluator input bundle, profile interpretation, realm evaluator
-- `tests/`: focused unit, smoke, integration, batch surface, export, run history, history summary, and history shortcut tests
+### Stage 1: Stabilize the runtime core
 
-## Freeze Status
+- keep the execution chain narrow
+- keep responsibilities explicit
+- keep failures diagnosable
 
-- Base baseline tag: `b-v0.4-baseline`
-- Intermediate `v0.5.x` profile-aware surface tag: `b-v0.5-profile-surface`
-- Intermediate `v0.5.x` batch surface tag: `b-v0.5-batch-surface`
-- Intermediate `v0.5.x` batch export tag: `b-v0.5-batch-export`
-- Intermediate `v0.5.x` history summary closeout tag: `b-v0.5-history-summary`
-- Intermediate `v0.5.x` history browsing closeout tag: `b-v0.5-history-browsing`
-- Current stable `v0.5.x` history shortcuts closeout tag: `b-v0.5-history-shortcuts`
-- Base baseline closeout commit: `d03be5565642ce385cf529d9eb65ddb199d32215`
-- Expected full-suite verification command:
+### Stage 2: Build the archive evidence layer
 
-```bash
-python -m unittest discover -s tests -p "test_*.py"
+- persist per-run artifacts
+- make runs readable and comparable
+- reduce regression diagnosis time
+
+### Stage 3: Validate with real usage
+
+- external UAT
+- repeated real usage diaries
+- hard acceptance checklist instead of subjective progress percentages
+
+### Deferred on purpose
+
+The following are intentionally deferred until the archive loop is proven in real work:
+
+- HTTP / API server layer
+- database-backed search or query DSL
+- async queue / worker infrastructure
+- plugin ecosystem
+- replay / rerun orchestration
+- large-scale multi-agent runtime expansion
+
+## Current Status
+
+This repository is currently at an alpha-stage validation phase.
+
+### What is already working
+
+- profile-aware task input normalization
+- single-task surface via CLI and programmatic entrypoints
+- sequential batch surface
+- batch export artifacts
+- append-only run history and latest-run shortcuts
+- archive-first per-run diagnostic persistence
+- archive browsing and comparison
+
+### What has been validated
+
+- real archive smoke flow across success, failure, governance-review, and coding-artifact scenarios
+- full local test suite passing
+- Windows-oriented CLI/UAT prep and shell-specific startup guidance
+
+### Verified results
+
+- Full test suite: `291` tests passed locally
+- Archive smoke loop validated on real runs
+- `archive --latest`, `archive --run-id`, and `archive --compare-run-id` all exercised on real diagnostic cases
+
+## Strengths
+
+Why this project may be useful to serious builders:
+
+- It optimizes for explainability of runs, not only run completion
+- It treats verification and governance as first-class concerns
+- It makes artifact-level differences visible
+- It is easier to reason about than larger systems that over-expand too early
+- It creates a path toward future multi-agent coordination without starting with uncontrolled complexity
+
+## Known Limitations
+
+Current known issues and limitations:
+
+- external UAT is still limited; usability is not yet broadly validated
+- first-run setup on Windows requires shell-specific instructions
+- raw `run` JSON is still heavier than ideal for first-time users
+- the archive contract currently writes many files per run; signal-to-noise ratio still needs more validation through repeated use
+- this is not yet a hosted product or production platform
+
+## Quick Start
+
+### Windows PowerShell
+
+```powershell
+$env:PYTHONPATH="."; python -m entrypoints.cli inspect-state
+$env:PYTHONPATH="."; python -m entrypoints.cli run --task "ping" --task-type retrieval
+python -m entrypoints.cli archive --latest
 ```
 
-- Expected current result at closeout: `Ran 246 tests`, `OK`
+### Windows CMD
 
-`v0.5.x` does not replace the meaning of the frozen `v0.4` baseline.
-It is a narrow profile-aware, batch-capable, export-capable, history-summary-capable, history-browsing-capable, and history-shortcuts-capable outer surface layer on top of that baseline.
-
-## Running The Minimal CLI
-
-Basic single-task execution:
-
-```bash
-python -m entrypoints.cli run --task "Search docs for runtime context"
+```cmd
+set PYTHONPATH=. & python -m entrypoints.cli inspect-state
+set PYTHONPATH=. & python -m entrypoints.cli run --task "ping" --task-type retrieval
+python -m entrypoints.cli archive --latest
 ```
 
-Sequential batch execution from a JSON or JSONL file:
+### Expected first-run outcome
 
-```bash
-python -m entrypoints.cli run --batch-file tasks.json
-```
+For the `ping` task, you should see:
 
-Sequential batch execution with default export artifacts plus default history manifest and latest-run pointer:
+- a successful JSON result from `run`
+- a new `run_id`
+- a readable latest archive summary from `archive --latest`
 
-```bash
-python -m entrypoints.cli run --batch-file tasks.json --output-dir exports
-```
+Important: for first-time evaluation, do not spend time reading the full raw `run` JSON. Start with `archive --latest` first.
 
-Sequential batch execution with a compact recent-history summary:
+## Recommended Read Order
 
-```bash
-python -m entrypoints.cli run --batch-file tasks.json --output-dir exports --write-history-summary --history-summary-limit 10
-```
+If you are evaluating the repository seriously, read these files in order:
 
-Read the latest recorded run from history artifacts:
+1. `README.md`
+2. `README.zh-CN.md`
+3. `PROJECT_ARCHITECTURE_STATUS_AND_ROADMAP.md`
+4. `docs/2026-04-02-archive-real-dev-smoke-test.md`
+5. `docs/2026-04-02-external-uat-quickstart.md`
+6. `docs/2026-04-02-m3-hard-acceptance-checklist.md`
 
-```bash
-python -m entrypoints.cli history --history-file exports/run_history.jsonl --latest
-```
+## Who This Is For
 
-Read the latest run_id directly:
+This repository is best suited for:
 
-```bash
-python -m entrypoints.cli history --history-file exports/run_history.jsonl --last-id
-```
+- builders working on AI agent runtime quality
+- developers who care about regression diagnosis
+- teams that want run-level evidence before expanding architecture
+- people exploring how to make AI agent systems more inspectable and governable
 
-Read the latest output directory directly:
+It is not yet aimed at casual end users.
 
-```bash
-python -m entrypoints.cli history --history-file exports/run_history.jsonl --last-output-dir
-```
+## Roadmap
 
-Read one exact run entry:
+Near-term focus:
 
-```bash
-python -m entrypoints.cli history --history-file exports/run_history.jsonl --run-id 20260330T101112Z_batch_export_demo_abc123
-```
+1. improve first-run usability
+2. complete external UAT with real users
+3. accumulate real usage diary evidence
+4. improve archive signal-to-noise ratio
+5. validate repeated-run stability before boundary expansion
 
-Read recent history summary entries:
+## Testing & Validation Materials
 
-```bash
-python -m entrypoints.cli history --history-file exports/run_history.jsonl --summary --limit 10
-```
+Relevant documents:
 
-Browse recent history with the default compact output:
+- `tests/uat_results/observation_logs/2026-04-02-pre-check-report.md`
+- `tests/uat_results/observation_logs/2026-04-02-uat-observation-summary.md`
+- `tests/uat_results/reports/2026-04-02-cli-cross-platform-compatibility.md`
+- `docs/2026-04-02-archive-real-dev-smoke-test.md`
+- `docs/2026-04-02-m3-hard-acceptance-checklist.md`
 
-```bash
-python -m entrypoints.cli history --history-file exports/run_history.jsonl --limit 10
-```
+## Alpha Notice
 
-Inspect persisted state summary:
+This is an alpha-stage engineering repository.
 
-```bash
-python -m entrypoints.cli inspect-state
-```
+If you want to test it, the most useful feedback is not “this looks cool,” but concrete observations such as:
 
-Inspect the latest task contract summary:
+- where you got stuck
+- which field names were confusing
+- whether `compare` changed your diagnosis or decision
+- whether the archive output saved time
 
-```bash
-python -m entrypoints.cli inspect-contract
-```
-
-## Programmatic Surface
-
-The minimal function-level surfaces are:
-
-- `run_task_request(...)` for a single `SurfaceTaskRequest`
-- `run_batch_request(...)` for a sequential `SurfaceBatchRequest`
-- `load_batch_request_file(...)` for `.json` and `.jsonl` batch request files
-- `BatchExportOptions` for thin export configuration
-- `export_batch_results(...)` for writing stable batch artifacts
-- `append_run_history_entry(...)` and `list_run_history(...)` for append-only export history
-- `write_latest_run_pointer(...)` and `write_run_history_summary(...)` for derived history files
-- `read_latest_run(...)`, `read_run_history_summary(...)`, and `browse_run_history(...)` for read-only history browsing
-- `get_latest_run_id(...)`, `get_latest_run_output_dir(...)`, `find_run_history_entry(...)`, and `format_history_brief(...)` for direct history shortcuts
-
-The append-only truth source is `run_history.jsonl`.
-`latest_run.json` and `run_history_summary.json` are derived files only.
-The browsing and shortcut helpers only read those files and never write them.
-They do not rewrite batch, export, or runtime payloads.
-This surface is intended for tests, automation, and future entry surfaces.
-It is not an HTTP server.
-
-## Baseline Artifacts
-
-The frozen comparison samples are still stored under `artifacts/baselines/v03`:
-
-- `success_event_trace.json`
-- `sandbox_success_trace.json`
-- `rollback_path_trace.json`
-- `governance_followup_trace.json`
-- `journal_append_trace.json`
-- `success_verification_report.json`
-- `success_residual_followup.json`
-- `success_metrics_summary.json`
-
-Baseline collection rule:
-
-- only top-level `*.json` files in `artifacts/baselines/v03` are part of the frozen baseline
-- ignore temporary directories and non-JSON spillover under that directory
-- future baseline diffs should enumerate these JSON files directly or glob only top-level `*.json`
-
-`v0.5.x` does not introduce a new frozen baseline artifact pack.
-It keeps the explicit `v0.3` comparison pack and adds profile-aware interpretation plus minimal single-task, batch, export, history, history-summary, history-browsing, and history-shortcuts surface handling on top of the existing runtime outputs.
-
-## What The Current System Explicitly Does Not Do
-
-The current version still does not implement:
-
-- HTTP server / FastAPI shell
-- queue / scheduler / async worker infrastructure
-- batch-driven adaptive replanning or cross-task mutation
-- artifact search or filter engine
-- history write-back, replay, or rerun controls
-- database-backed state
-- full-text search or query DSL
-- report templating engines or dashboard systems
-- parallel worker pools or subagent runtime
-- async event bus / queue infrastructure
-- plugin systems
-- automatic model or methodology execution
-- automatic governance override
-- compare/evaluator-driven control flow
-- journal ranking, forgetting, or semantic retrieval
-- failure journal as a separate system
-- complex recovery chains or transaction systems
-
-## Suggested Next Direction
-
-`v0.5.x` can reasonably stop here as a local automation toolchain v1 complete.
-
-If there is a concrete need for external process callers, remote invocation, or service-style integration, then the next phase should be `minimal HTTP/API server shell` as a deliberate `v0.6.x` boundary expansion.
-
-Without that requirement, the current local CLI/toolchain surface is already coherent and stable enough to freeze.
+That kind of feedback is what this repository is designed to turn into real improvements.

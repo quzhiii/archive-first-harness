@@ -151,6 +151,24 @@ class SurfaceTaskRunnerTests(unittest.TestCase):
         self.assertEqual(result["telemetry"], result["metrics_summary"])
         self.assertEqual(result["evaluation"], result["realm_evaluation"])
 
+    def test_coding_task_prefers_write_path_and_produces_code_patch_artifact(self) -> None:
+        result = run_task_request(
+            SurfaceTaskRequest(task="Implement a tiny archive marker file", task_type="coding"),
+            load_settings(),
+        )
+
+        self.assertEqual(result["execution_result"]["tool_name"], "write_file")
+        self.assertEqual(
+            result["execution_result"]["artifacts"],
+            [{"type": "file_change", "path": "artifacts/output.txt"}],
+        )
+        self.assertFalse(
+            any(
+                warning.get("code") == "missing_expected_artifact"
+                for warning in result["verification_report"]["warnings"]
+            )
+        )
+
     def test_surface_does_not_introduce_control_semantics_on_failure(self) -> None:
         result = run_task_request(
             SurfaceTaskRequest(

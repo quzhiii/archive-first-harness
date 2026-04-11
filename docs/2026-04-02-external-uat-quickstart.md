@@ -34,6 +34,25 @@ For the first try:
 
 ---
 
+## Step 0: Use the repo-local quickstart first
+
+From the repo root, run this before trying shell-specific `PYTHONPATH` setup:
+
+```bash
+python quickstart.py
+```
+
+This is the preferred first-run path because it:
+
+- uses the repository-local entry directly
+- runs `inspect-state -> ping run -> archive --latest`
+- prints human-readable output instead of leading with raw JSON
+- avoids the most common PowerShell / CMD environment mistakes
+
+If `quickstart.py` works, move on to the manual commands below only if you want to inspect the individual CLI surfaces.
+
+---
+
 ## Step 1: Inspect State
 
 ### PowerShell
@@ -80,6 +99,8 @@ You should see:
 - a newly generated `run_id`
 - a normal JSON response instead of a crash
 
+Important: for a first trial, do not read all of that JSON line by line. The next step is the real first-use checkpoint.
+
 ---
 
 ## Step 3: Read the Latest Archive
@@ -114,7 +135,13 @@ python -m entrypoints.cli archive --status failed --limit 10
 
 ## Step 5: Compare Two Runs
 
-Pick two real run ids and compare them:
+If you do not already have two runs, create deterministic demo runs first:
+
+```bash
+python -m entrypoints.cli demo
+```
+
+Then either compare the printed demo ids, or pick two real run ids and compare them:
 
 ```bash
 python -m entrypoints.cli archive --compare-run-id <id_1> --compare-run-id <id_2>
@@ -164,6 +191,7 @@ An "extended pass" means they can also:
 Based on the current UAT evidence, the main friction points are:
 
 - first-run shell differences between PowerShell and CMD
+- users not knowing they can start with `python quickstart.py`
 - users paying too much attention to raw `run` JSON at the start
 - onboarding still being more technical than it should be
 

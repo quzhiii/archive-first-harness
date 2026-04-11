@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import json
@@ -14,6 +14,7 @@ from entrypoints.archive_browse import (
 )
 from entrypoints.batch_export import BatchExportOptions, export_batch_results
 from entrypoints.batch_runner import load_batch_request_file, run_batch_request
+from entrypoints.demo_flow import ensure_demo_archives, format_demo_brief
 from entrypoints.history_browse import (
     browse_run_history,
     find_run_history_entry,
@@ -23,10 +24,17 @@ from entrypoints.history_browse import (
     read_latest_run,
     read_run_history_summary,
 )
-from entrypoints.history_summary import write_latest_run_pointer, write_run_history_summary
+from entrypoints.history_summary import (
+    write_latest_run_pointer,
+    write_run_history_summary,
+)
 from entrypoints.run_history import append_run_history_entry
 from entrypoints.settings import load_settings
-from entrypoints.task_runner import SurfaceTaskRequest, run_task_request, surface_result_succeeded
+from entrypoints.task_runner import (
+    SurfaceTaskRequest,
+    run_task_request,
+    surface_result_succeeded,
+)
 from runtime.executor import Executor
 
 
@@ -108,6 +116,15 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
+        if args.command == "demo":
+            print(
+                demo_command(
+                    settings,
+                    archive_root=args.archive_root,
+                )
+            )
+            return 0
+
         raise ValueError(f"unsupported command: {args.command}")
     except Exception as exc:
         print(f"CLI error: {exc}", file=sys.stderr)
@@ -166,7 +183,9 @@ def run_batch_command(
     output = dict(result)
     export_result = export_batch_results(result, export_options)
     output["artifacts_export"] = export_result
-    history_result = append_run_history_entry(result, export_result, history_file=history_file)
+    history_result = append_run_history_entry(
+        result, export_result, history_file=history_file
+    )
     output["run_history"] = history_result
     history_index: dict[str, Any] = {
         "latest_run": write_latest_run_pointer(history_result["history_file"]),
@@ -229,7 +248,9 @@ def history_command(
     run_id: str | None = None,
     limit: int | None = None,
 ) -> str:
-    resolved_history_file = str(history_file or (settings.artifacts_dir / "run_history.jsonl"))
+    resolved_history_file = str(
+        history_file or (settings.artifacts_dir / "run_history.jsonl")
+    )
     if last_id:
         return get_latest_run_id(resolved_history_file)
     if last_output_dir:
@@ -271,7 +292,9 @@ def archive_command(
 
     compare_values = [item for item in (compare_run_ids or []) if str(item).strip()]
     if len(compare_values) == 2:
-        payload = compare_run_archives(resolved_archive_root, compare_values[0], compare_values[1])
+        payload = compare_run_archives(
+            resolved_archive_root, compare_values[0], compare_values[1]
+        )
         return format_archive_brief(payload)
     if compare_values:
         raise ValueError("--compare-run-id must be provided exactly twice")
@@ -292,15 +315,34 @@ def archive_command(
     return format_archive_brief(payload)
 
 
+def demo_command(
+    settings,
+    *,
+    archive_root: str | None = None,
+) -> str:
+    payload = ensure_demo_archives(settings, archive_root=archive_root)
+    return format_demo_brief(payload)
+
+
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Minimal CLI for the profile-aware runtime harness")
+    parser = argparse.ArgumentParser(
+        description="Minimal CLI for the profile-aware runtime harness"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    run_parser = subparsers.add_parser("run", help="Run a single task through the minimal surface")
+    run_parser = subparsers.add_parser(
+        "run", help="Run a single task through the minimal surface"
+    )
     run_parser.add_argument("task_parts", nargs="*", help="Task description to run")
     run_parser.add_argument("--task", dest="task_text", help="Task description to run")
-    run_parser.add_argument("--batch-file", dest="batch_file", help="Path to a batch json/jsonl request file")
-    run_parser.add_argument("--batch-name", dest="batch_name", help="Optional batch name override")
+    run_parser.add_argument(
+        "--batch-file",
+        dest="batch_file",
+        help="Path to a batch json/jsonl request file",
+    )
+    run_parser.add_argument(
+        "--batch-name", dest="batch_name", help="Optional batch name override"
+    )
     run_parser.add_argument(
         "--stop-on-error",
         dest="stop_on_error",
@@ -347,10 +389,20 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Export a minimal markdown batch summary",
     )
-    run_parser.add_argument("--task-type", dest="task_type", help="Optional task type override")
-    run_parser.add_argument("--workflow-profile-id", dest="workflow_profile_id", help="Canonical workflow profile id")
-    run_parser.add_argument("--workflow-profile", dest="workflow_profile", help="Workflow profile alias")
-    run_parser.add_argument("--mission-profile-id", dest="mission_profile_id", help="Mission profile alias")
+    run_parser.add_argument(
+        "--task-type", dest="task_type", help="Optional task type override"
+    )
+    run_parser.add_argument(
+        "--workflow-profile-id",
+        dest="workflow_profile_id",
+        help="Canonical workflow profile id",
+    )
+    run_parser.add_argument(
+        "--workflow-profile", dest="workflow_profile", help="Workflow profile alias"
+    )
+    run_parser.add_argument(
+        "--mission-profile-id", dest="mission_profile_id", help="Mission profile alias"
+    )
     run_parser.add_argument(
         "--success-criteria",
         dest="success_criteria",
@@ -365,9 +417,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     subparsers.add_parser("inspect-state", help="Inspect persisted state summary")
-    subparsers.add_parser("inspect-contract", help="Inspect the latest contract summary")
+    subparsers.add_parser(
+        "inspect-contract", help="Inspect the latest contract summary"
+    )
 
-    history_parser = subparsers.add_parser("history", help="Browse recent run history artifacts")
+    history_parser = subparsers.add_parser(
+        "history", help="Browse recent run history artifacts"
+    )
     history_parser.add_argument(
         "--history-file",
         dest="history_file",
@@ -409,7 +465,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Show a minimal summary for one exact run_id match.",
     )
 
-    archive_parser = subparsers.add_parser("archive", help="Browse per-run diagnostic archives")
+    archive_parser = subparsers.add_parser(
+        "archive", help="Browse per-run diagnostic archives"
+    )
     archive_parser.add_argument(
         "--archive-root",
         dest="archive_root",
@@ -463,6 +521,16 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Optional recent-entry limit for archive browsing. Defaults to 10.",
     )
+
+    demo_parser = subparsers.add_parser(
+        "demo",
+        help="Create deterministic demo archives for archive browse/compare onboarding",
+    )
+    demo_parser.add_argument(
+        "--archive-root",
+        dest="archive_root",
+        help="Optional path to artifacts/runs. Defaults to <artifacts-dir>/runs.",
+    )
     return parser
 
 
@@ -479,7 +547,9 @@ def _resolve_task_text(args) -> str:
         if text:
             return text
 
-    raise ValueError("run requires a task description via --task, positional args, or stdin")
+    raise ValueError(
+        "run requires a task description via --task, positional args, or stdin"
+    )
 
 
 def _print_json(payload: dict[str, Any]) -> None:
@@ -560,7 +630,9 @@ def _validate_batch_run_args(args) -> None:
     ):
         value = getattr(args, field_name, None)
         if value:
-            raise ValueError(f"--batch-file cannot be combined with --{field_name.replace('_', '-')}")
+            raise ValueError(
+                f"--batch-file cannot be combined with --{field_name.replace('_', '-')}"
+            )
 
 
 def _validate_single_run_args(args) -> None:
@@ -577,7 +649,9 @@ def _validate_single_run_args(args) -> None:
     ):
         value = getattr(args, field_name, None)
         if value:
-            raise ValueError(f"--{field_name.replace('_', '-')} is only supported with --batch-file")
+            raise ValueError(
+                f"--{field_name.replace('_', '-')} is only supported with --batch-file"
+            )
 
 
 def _validate_history_args(args) -> None:
@@ -597,14 +671,17 @@ def _validate_history_args(args) -> None:
     limit = getattr(args, "limit", None)
     if limit is not None and limit < 0:
         raise ValueError("--limit must be non-negative")
-    if any(
-        (
-            bool(getattr(args, "latest", False)),
-            bool(getattr(args, "last_id", False)),
-            bool(getattr(args, "last_output_dir", False)),
-            bool(getattr(args, "run_id", None)),
+    if (
+        any(
+            (
+                bool(getattr(args, "latest", False)),
+                bool(getattr(args, "last_id", False)),
+                bool(getattr(args, "last_output_dir", False)),
+                bool(getattr(args, "run_id", None)),
+            )
         )
-    ) and limit is not None:
+        and limit is not None
+    ):
         raise ValueError("--limit is only used with summary/browse modes")
 
 
@@ -614,7 +691,11 @@ def _validate_archive_args(args) -> None:
         raise ValueError("--limit must be non-negative")
 
     latest = bool(getattr(args, "latest", False))
-    compare_run_ids = [item for item in list(getattr(args, "compare_run_id", None) or []) if str(item).strip()]
+    compare_run_ids = [
+        item
+        for item in list(getattr(args, "compare_run_id", None) or [])
+        if str(item).strip()
+    ]
     run_id = getattr(args, "run_id", None)
 
     if latest and run_id:
@@ -635,7 +716,9 @@ def _validate_archive_args(args) -> None:
             limit is not None,
         )
     ):
-        raise ValueError("compare mode cannot be combined with browse filters or --limit")
+        raise ValueError(
+            "compare mode cannot be combined with browse filters or --limit"
+        )
     if (latest or run_id) and any(
         (
             getattr(args, "task_type", None),
@@ -643,7 +726,9 @@ def _validate_archive_args(args) -> None:
             limit is not None,
         )
     ):
-        raise ValueError("--task-type, --formation-id, and --limit are only used with archive browse mode")
+        raise ValueError(
+            "--task-type, --formation-id, and --limit are only used with archive browse mode"
+        )
 
 
 if __name__ == "__main__":

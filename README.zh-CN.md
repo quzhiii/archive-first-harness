@@ -147,6 +147,22 @@
 
 ## 快速开始
 
+### 最快的首次运行
+
+在仓库根目录执行：
+
+```bash
+python quickstart.py
+```
+
+它会依次完成：
+
+- 检查 `inspect-state`
+- 跑一次最小的 `ping`
+- 立即展示 `archive --latest`
+
+推荐把这条命令作为首次上手路径，因为它自动处理了 Windows 上最常见的 `PYTHONPATH` 问题，而且不会一上来就给你打印完整的 `run` JSON。
+
 ### 环境
 
 - 推荐 Python `3.13.2`

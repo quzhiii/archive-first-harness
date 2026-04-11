@@ -149,6 +149,22 @@ That is a good alpha-stage problem. It means the bottleneck is onboarding clarit
 
 ## Quick Start
 
+### Fastest first run
+
+From the repo root:
+
+```bash
+python quickstart.py
+```
+
+What it does:
+
+- checks `inspect-state`
+- runs a minimal `ping`
+- immediately shows `archive --latest`
+
+This is the recommended first-run path because it avoids the most common Windows `PYTHONPATH` friction and keeps the raw `run` JSON out of your way until the archive loop is working.
+
 ### Environment
 
 - Recommended: Python `3.13.2`
@@ -171,6 +187,12 @@ python -m entrypoints.cli run --task "ping" --task-type retrieval
 python -m entrypoints.cli archive --latest
 ```
 
+Or just:
+
+```powershell
+python quickstart.py
+```
+
 ### CMD
 
 ```cmd
@@ -178,6 +200,12 @@ set PYTHONPATH=.
 python -m entrypoints.cli inspect-state
 python -m entrypoints.cli run --task "ping" --task-type retrieval
 python -m entrypoints.cli archive --latest
+```
+
+Or just:
+
+```cmd
+python quickstart.py
 ```
 
 ### Expected First Run
@@ -189,6 +217,21 @@ For the `ping` task, you should see:
 - a readable archive summary from `archive --latest`
 
 For first-time evaluation, start with `archive --latest` instead of the full raw `run` output.
+
+### Deterministic demo flow for `compare`
+
+If you want a guaranteed compare pair without creating your own second run first:
+
+```bash
+python -m entrypoints.cli demo
+```
+
+That command creates or reuses two clearly labeled demo archives:
+
+- one success-like run
+- one failure-like run
+
+Then use the printed commands to browse or compare them directly.
 
 ## Who This Is For
 

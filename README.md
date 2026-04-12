@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**Debug AI agent runs with evidence, not guesswork.**
+**Agent Evidence Layer — Debug AI agent runs with evidence, not guesswork.**
 
 [![Python](https://img.shields.io/badge/python-3.13.2-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Stage](https://img.shields.io/badge/stage-public%20alpha-1f6feb)](#current-status)
@@ -11,6 +11,32 @@
 [**中文文档**](README.zh-CN.md) | [English](README.md)
 
 </div>
+
+---
+
+## What Is This
+
+**The missing fourth layer in AI agent stack.**
+
+Current agent ecosystem has three layers:
+
+```
+┌────────────────────────────────────────┐
+│  Framework      │  LangGraph, CrewAI   │  ← Build agents
+├────────────────────────────────────────┤
+│  Harness        │  OpenHands, Aider    │  ← Run agents  
+├────────────────────────────────────────┤
+│  Observability  │  LangSmith, Langfuse │  ← Trace & monitor
+├────────────────────────────────────────┤
+│  Evidence Layer │  archive-first-harness│  ← Diagnose & compare ← YOU ARE HERE
+└────────────────────────────────────────┘
+```
+
+**Framework** helps you build agents. **Harness** gives you runtime. **Observability** shows you traces.
+
+But when your agent worked yesterday and fails today, you need the **fourth layer**: a system that archives structured evidence of every run and lets you compare them precisely.
+
+This is **Evidence Layer**: local-first, zero-dependency, purpose-built for "what changed?" debugging.
 
 ---
 

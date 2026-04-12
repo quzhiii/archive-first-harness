@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**调试 AI Agent 不靠猜，每次运行都有据可查。**
+**Agent Evidence Layer — 调试 AI Agent 不靠猜，每次运行都有据可查。**
 
 [![Python](https://img.shields.io/badge/python-3.13.2-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![阶段](https://img.shields.io/badge/阶段-public%20alpha-1f6feb)](#当前状态)
@@ -11,6 +11,32 @@
 [中文文档](README.zh-CN.md) | [**English**](README.md)
 
 </div>
+
+---
+
+## 这是什么
+
+**AI Agent 技术栈缺失的第四层。**
+
+当前 Agent 生态有三层：
+
+```
+┌────────────────────────────────────────┐
+│  框架层      │  LangGraph, CrewAI      │  ← 构建 Agent
+├────────────────────────────────────────┤
+│  运行时层    │  OpenHands, Aider       │  ← 运行 Agent
+├────────────────────────────────────────┤
+│  可观测层    │  LangSmith, Langfuse    │  ← 追踪监控
+├────────────────────────────────────────┤
+│  证据层      │  archive-first-harness  │  ← 诊断对比 ← 就是这里
+└────────────────────────────────────────┘
+```
+
+**框架层**帮你构建 Agent。**运行时层**提供执行环境。**可观测层**展示调用链。
+
+但当你的 Agent 昨天能跑、今天挂了，你需要的是**第四层**：一个归档每次运行结构化证据、并能精确对比差异的系统。
+
+这就是 **Evidence Layer（证据层）**：本地优先、零依赖、专为"哪里变了"而生。
 
 ---
 

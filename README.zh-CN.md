@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**用证据调试 AI Agent，而不是靠猜测。**
+**调试 AI Agent 不靠猜，每次运行都有据可查。**
 
 [![Python](https://img.shields.io/badge/python-3.13.2-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![阶段](https://img.shields.io/badge/阶段-public%20alpha-1f6feb)](#当前状态)
@@ -11,6 +11,227 @@
 [中文文档](README.zh-CN.md) | [**English**](README.md)
 
 </div>
+
+---
+
+## 解决的痛点
+
+| 痛点 | 传统方式 | Archive-First |
+|------|---------|---------------|
+| 调试 Agent 失败 | 翻日志、猜原因、再重试 | 结构化归档，精确对比差异 |
+| "昨天还能跑" | 不知道哪里变了 | `--compare` 并排看变化 |
+| 失败定位 | 日志里找异常 | 失败类型、阶段自动分类 |
+| 成功但无输出 | 以为成功了，其实没产物 | 验证报告检查预期产物 |
+| 调优靠感觉 | 改参数碰运气 | 两次运行数据对比验证 |
+
+---
+
+## 30 秒上手
+
+```bash
+git clone https://github.com/quzhiii/archive-first-harness.git
+cd archive-first-harness
+python quickstart.py
+```
+
+**输出示例：**
+
+```
+archive-first-harness quickstart
+================================
+[1/3] inspect-state       → ok | 30 state files
+[2/3] run ping            → success | run_id=20260412_143022_7a3f
+[3/3] archive --latest    → verification=passed | artifacts=1 file
+
+✅ 首次运行完成！试试：
+   python -m entrypoints.cli demo
+   python -m entrypoints.cli archive --summary
+```
+
+---
+
+## 核心能力
+
+### 1. 运行即归档
+
+每次 `run` 自动保存结构化证据：
+
+```
+artifacts/runs/<run_id>/
+├── manifest.json          # 任务请求、状态、时间
+├── verification_report.json   # 验证结果、产物清单
+├── failure_signature.json     # 失败类型、阶段、原因
+├── execution_trace.jsonl      # 执行步骤日志
+└── final_output.json          # 最终输出
+```
+
+### 2. 查看与对比
+
+| 命令 | 用途 |
+|------|------|
+| `archive --latest` | 查看最新运行摘要 |
+| `archive --run-id <id>` | 查看指定运行详情 |
+| `archive --compare-run-id <id1> <id2>` | 对比两次运行差异 |
+| `archive --summary` | 统计趋势（成功/失败分布） |
+| `demo` | 创建示例数据用于体验对比 |
+
+**对比输出示例：**
+
+```
+对比: run_20260412_143022 vs run_20260412_143045
+================================================
+状态:        success        →   failed
+失败类型:    -              →   timeout
+验证:        passed         →   failed
+产物:        1 file         →   0 files
+执行时间:    2.3s           →   30.0s (超时)
+```
+
+---
+
+## 架构设计
+
+### 分层结构
+
+```
+┌─────────────────────────────────────────┐
+│  用户界面层  │  CLI (quickstart.py)      │
+├─────────────────────────────────────────┤
+│  运行时层    │  Task Runner → Executor   │
+│              │  → Verifier               │
+├─────────────────────────────────────────┤
+│  证据层      │  manifest / verification  │
+│  (Archive)   │  / failure / trace        │
+├─────────────────────────────────────────┤
+│  查询层      │  --latest / --compare     │
+│              │  / --summary              │
+└─────────────────────────────────────────┘
+```
+
+### 设计原则
+
+1. **归档优先**：证据是一等公民，不是副产品
+2. **运行时保守**：执行路径简单、可预测、不藏逻辑
+3. **零依赖**：纯 Python 标准库，无外部包
+4. **本地优先**：数据存在本地文件，完全可控
+
+---
+
+## 典型使用流程
+
+```
+日常开发                        问题排查
+─────────────────────────────────────────────────
+1. run 任务          →         发现异常
+2. archive --latest  →         archive --compare 
+   确认结果                      新旧对比
+3. 继续开发          →         定位问题
+                               修复后验证
+```
+
+### 场景示例
+
+**场景：Agent 昨天能跑，今天超时**
+
+```bash
+# 找到昨天和今天的运行 ID
+python -m entrypoints.cli archive --summary --status failed
+# → 发现今天有 3 次 timeout
+
+# 对比最近一次成功和失败
+python -m entrypoints.cli archive \
+  --compare-run-id 20260411_success \
+  --compare-run-id 20260412_timeout
+
+# 输出显示：
+# - 任务输入相同
+# - 执行步骤相同
+# - 但执行时间从 2s → 30s (超时)
+# → 结论：外部 API 响应变慢，需增加重试或调大超时
+```
+
+---
+
+## 当前状态
+
+**Public Alpha** — 核心功能稳定，正在收集使用反馈。
+
+### 已可用 ✅
+
+- 单任务 CLI 执行
+- 自动归档（manifest/verification/failure/trace）
+- 查看最新、指定 ID、筛选列表
+- 两次运行并排对比（差异高亮）
+- 趋势摘要统计
+- 291 项测试通过
+- Windows / Linux / macOS 验证
+
+### 暂不可用 ❌
+
+- Web 界面（CLI 优先）
+- 数据库存储（文件系统足够）
+- 异步队列（顺序执行足够）
+- 托管服务（本地工具定位）
+
+---
+
+## 适用场景
+
+**适合你，如果：**
+- 你正在构建 AI Agent，需要调试失败原因
+- 你想比较两次运行的差异，而不是靠记忆
+- 你关心"运行是否有产物"，不只是"是否没报错"
+- 你喜欢简单工具，而不是复杂平台
+
+**不适合你，如果：**
+- 你需要完整的终端用户产品
+- 你想要托管 API 服务
+- 你需要企业级功能（SSO、审计等）
+
+---
+
+## 开发路线
+
+| 阶段 | 目标 | 状态 |
+|------|------|------|
+| v0.1 | 基础运行 + 归档 | ✅ 完成 |
+| v0.2 | Browse + Compare 查询 | ✅ 完成 |
+| v0.3 | Quickstart + Demo 体验 | ✅ 完成 |
+| v0.4 | **收集外部反馈** | 🚧 当前 |
+| v0.5 | Archive 信噪比优化 | 📋 计划 |
+| v1.0 | 稳定版发布 | 📋 计划 |
+
+---
+
+## 参与测试
+
+我们正在招募测试者！如果你愿意试用并反馈：
+
+1. **快速体验**：`python quickstart.py`
+2. **查看反馈清单**：[docs/2026-04-12-external-feedback-checklist.md](docs/2026-04-12-external-feedback-checklist.md)
+3. **提交 Issue**：[GitHub Issues](https://github.com/quzhiii/archive-first-harness/issues)
+
+**最有价值的反馈：**
+- 在哪里卡住了？
+- 哪些输出看不懂？
+- 对比功能是否真的帮你定位了问题？
+
+---
+
+## 相关文档
+
+- [快速开始指南](docs/2026-04-02-external-uat-quickstart.md) — 详细步骤
+- [反馈清单](docs/2026-04-12-external-feedback-checklist.md) — 测试检查项
+- [架构详情](docs/diagrams/architecture-overview.md) — 图表说明
+
+---
+
+<div align="center">
+
+**[↑ 回到顶部](#archive-first-harness)**
+
+</div>
+
 
 ---
 

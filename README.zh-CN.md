@@ -2,249 +2,307 @@
 
 <div align="center">
 
-**一个面向 AI Agent 的 archive-first 运行时骨架，让每次运行都能被诊断、比较和治理。**
+**用证据调试 AI Agent，而不是靠猜测。**
 
 [![Python](https://img.shields.io/badge/python-3.13.2-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![阶段](https://img.shields.io/badge/阶段-public%20alpha-1f6feb)](#当前状态)
-[![重点](https://img.shields.io/badge/重点-archive--first-111111)](#为什么要做这个项目)
 [![测试](https://img.shields.io/badge/测试-291%20项通过-brightgreen)](#验证情况)
 
 [中文文档](README.zh-CN.md) | [**English**](README.md)
-
-[快速开始](#快速开始) • [为什么要做这个项目](#为什么要做这个项目) • [核心优势](#核心优势) • [当前架构](#当前架构) • [验证情况](#验证情况) • [路线图](#路线图)
 
 </div>
 
 ---
 
-## 这是什么
+## 这个工具能做什么
 
-`archive-first-harness` 不是一个上来就想做成“大而全平台”的 AI Agent 项目。
+**清楚地看到 AI Agent 做了什么、为什么这么做——不用翻原始日志。**
 
-它当前只聚焦一个很硬的工程问题：
+当你的 AI Agent 运行任务时，这个工具会自动记录结构化的执行证据：
+- 输入了什么任务
+- 每一步是如何执行的
+- 验证是通过还是失败
+- 产生了哪些输出文件
+- 在哪里、为什么失败（如果失败了）
 
-**当一次 Agent run 成功、失败、或者相对上一版退化时，我们能不能用证据解释清楚，而不是靠感觉猜。**
+然后你可以：
+- **查看**最新一次运行的人类可读摘要
+- **对比**两次运行，精确看到哪里变了
+- **筛选**特定类型的运行（按任务类型、状态、失败类型等）
 
-为了解这个问题，项目现在采取的是 archive-first 的路线：
+把它想象成 AI Agent 的**黑匣子**：轻量、始终开启、专为调试实际问题设计，而不是为了展示效果。
 
-- runtime 主链先保持克制
-- 每次 run 落结构化证据
-- 让 run 在事后可以浏览、定位、比较
-- 用诊断闭环驱动优化，而不是靠单次 demo 的观感
+```mermaid
+flowchart TB
+    subgraph Traditional["❌ 传统调试方式"]
+        T1[运行任务] --> T2[查看日志]
+        T2 --> T3[猜测原因]
+        T3 --> T4[再跑一次]
+        T4 --> T2
+    end
 
-如果你关心的是可复盘、可验证、可比较的 Agent 工程能力，而不是表面上看起来多聪明，这个仓库就是为这件事做的。
-
-## 为什么要做这个项目
-
-很多 Agent 系统在演示时很亮眼，但一旦进入真实任务，就会立刻暴露一个问题：**事后说不清楚。**
-
-最常见的问题包括：
-
-| 问题 | 为什么重要 |
-|---|---|
-| 为什么这次失败？ | 不知道原因，就无法改进。 |
-| 失败发生在哪一层？ | 需要区分是路由、执行、验证还是治理出了问题。 |
-| 为什么这次比上次差？ | 没有比较能力，就只能凭印象调参。 |
-| 这次到底有没有产出预期交付物？ | “看起来成功”不等于真的成功。 |
-| 下一步应该改哪里？ | 优化应该由证据驱动，而不是靠主观判断。 |
-
-这个仓库存在的意义，就是把这些问题变成可以回答的问题。
-
-## 核心优势
-
-### 1. archive-first，而不是 demo-first
-
-每次 run 都被当作一个可以事后复盘的工程事件，而不是一次性的效果展示。
-
-### 2. 诊断证据是一级产物
-
-每次 run 可以落到 `artifacts/runs/<run_id>/`，典型内容包括：
-
-- `manifest.json`
-- `verification_report.json`
-- `failure_signature.json`
-- `execution_trace.jsonl`
-- `final_output.json`
-
-### 3. 已经形成一条可用的比较闭环
-
-当前最实用的闭环是：
-
-`run -> latest -> browse -> run-id -> compare`
-
-这比人工翻原始 JSON 去猜哪里变了，更接近真实工程里的使用方式。
-
-### 4. runtime 主链保持保守
-
-项目现在不会让 evaluator 或 compare 反过来悄悄接管执行控制面。主链依旧保持窄、稳、可定位。
-
-### 5. 明确克制边界
-
-当前故意不做数据库、队列、插件市场、平台化 API 和大规模多 Agent 编排。先把地基打稳，再谈扩边界。
-
-## 当前架构
-
-当前结构可以理解为“稳定的 runtime 主链 + archive 证据层”。
-
-| 层级 | 主要职责 |
-|---|---|
-| `entrypoints/` | CLI 入口、task runner、batch runner、history、archive 入口 |
-| `runtime/` | orchestrator、executor、verifier、路由与治理衔接 |
-| `harness/` | state、contracts、context、tools、journal、telemetry、evaluation 基础设施 |
-| `planner/` | task contract 与规划辅助 |
-| `tests/` | 单测、冒烟、archive/history/integration 验证 |
-
-### Runtime 主链
-
-`request -> 输入标准化 -> task contract -> state/context -> execution -> verification -> governance -> 必要时 rollback -> journal -> telemetry -> evaluation inputs`
-
-### Archive 诊断链
-
-`run -> write_run_archive(...) -> artifacts/runs/<run_id>/ -> archive --latest / --run-id / --compare-run-id`
-
-### 当前设计原则
-
-先把它做成一个可靠的底层骨架，而不是先做成一个边界很大的平台。
-
-## 当前状态
-
-这个仓库目前处于 **public alpha** 阶段。
-
-已经可用的部分：
-
-- profile-aware 输入标准化
-- 单任务 CLI 执行
-- 顺序 batch 执行
-- append-only 历史记录与 latest 快捷读取
-- 单次 run 的 archive 归档
-- archive 浏览
-- run 间 compare 对比
-
-明确暂缓的部分：
-
-- 托管 API 服务
-- 数据库检索层
-- async queue / worker
-- 插件生态
-- 大规模多 Agent 协调
-
-## 验证情况
-
-这个项目现在不是只停留在文档层，核心链路已经被实际跑过。
-
-### 已验证结果
-
-- 本地全量测试：`291` 项通过
-- 已完成成功、失败、governance-review、coding-artifact 等真实场景下的 smoke flow
-- `archive --latest`、`archive --run-id`、`archive --compare-run-id` 都已经在真实 run 上验证
-- 外部 UAT 结果显示，当前主要问题是首次进入门槛，而不是 archive 逻辑本身失效
-
-### 当前最关键的结论
-
-**archive 闭环已经有用了，但第一次上手体验还不够顺。**
-
-这是一个可以接受的 alpha 问题，说明现在的瓶颈更偏向 onboarding，而不是底层架构完全站不住。
-
-## 快速开始
-
-### 最快的首次运行
-
-在仓库根目录执行：
-
-```bash
-python quickstart.py
+    subgraph ArchiveFirst["✅ Archive-First 方式"]
+        A1[运行任务] --> A2[自动保存结构化证据]
+        A2 --> A3[archive --latest 查看最新]
+        A3 --> A4[精确定位问题]
+        A4 --> A5[修复后对比]
+        A5 --> A6[archive --compare 验证修复]
+    end
 ```
 
-它会依次完成：
+---
 
-- 检查 `inspect-state`
-- 跑一次最小的 `ping`
-- 立即展示 `archive --latest`
+## 快速开始（30秒）
 
-推荐把这条命令作为首次上手路径，因为它自动处理了 Windows 上最常见的 `PYTHONPATH` 问题，而且不会一上来就给你打印完整的 `run` JSON。
+### 环境要求
+- Python 3.13+
+- Git
 
-### 环境
-
-- 推荐 Python `3.13.2`
-- 当前 baseline 不依赖第三方运行时库
-- 当前主要验证环境是 Windows PowerShell 和 CMD
-
-### 克隆仓库
+### 运行命令
 
 ```bash
 git clone https://github.com/quzhiii/archive-first-harness.git
 cd archive-first-harness
+python quickstart.py
 ```
 
-### PowerShell
+**会发生什么：**
+1. 检查系统状态
+2. 运行一个最简单的 "ping" 任务
+3. 显示刚才运行的人类可读摘要
 
-```powershell
-$env:PYTHONPATH="."
-python -m entrypoints.cli inspect-state
-python -m entrypoints.cli run --task "ping" --task-type retrieval
+就这些。不需要配置，不需要安装依赖。
+
+### 体验演示
+
+```bash
+python -m entrypoints.cli demo
+```
+
+这会创建两个示例运行（一个成功、一个失败），让你马上体验对比功能：
+
+```bash
+python -m entrypoints.cli archive --compare-run-id demo_success_ping --compare-run-id demo_failure_guardrail
+```
+
+---
+
+## 实际使用场景
+
+这是你在实际工作中会如何使用它：
+
+```mermaid
+sequenceDiagram
+    participant You as 开发者
+    participant CLI as 命令行
+    participant Runtime as Agent 运行时
+    participant Archive as 归档存储
+
+    You->>CLI: python -m entrypoints.cli run --task "研究 X" --task-type retrieval
+    CLI->>Runtime: 执行任务
+    Runtime->>Runtime: 执行步骤 + 验证
+    Runtime->>Archive: 保存结构化证据<br/>(清单、验证报告、失败信息、产物)
+    
+    You->>CLI: archive --latest
+    CLI->>Archive: 读取最新运行
+    Archive-->>CLI: 人类可读摘要
+    CLI-->>You: "状态：成功 | 任务：研究 X | 产物：report.md"
+    
+    Note over You: 后来：出问题了
+    
+    You->>CLI: archive --compare-run-id 旧运行 --compare-run-id 新运行
+    CLI->>Archive: 获取两次运行
+    Archive-->>CLI: 差异分析
+    CLI-->>You: "验证：通过 → 失败<br/>失败类型：无 → 超时<br/>产物：+report.md"
+```
+
+### 常用命令
+
+```bash
+# 运行任务
+python -m entrypoints.cli run --task "总结这篇文章" --task-type retrieval
+
+# 查看最新运行（人类可读）
 python -m entrypoints.cli archive --latest
+
+# 查找特定运行
+python -m entrypoints.cli archive --run-id 20260411T133512Z_ping_3eef61
+
+# 对比两次运行
+python -m entrypoints.cli archive --compare-run-id <id1> --compare-run-id <id2>
+
+# 查看筛选后的趋势摘要
+python -m entrypoints.cli archive --summary --task-type retrieval
 ```
 
-### CMD
+---
 
-```cmd
-set PYTHONPATH=.
-python -m entrypoints.cli inspect-state
-python -m entrypoints.cli run --task "ping" --task-type retrieval
-python -m entrypoints.cli archive --latest
+## 为什么需要这个
+
+大多数 AI Agent 系统在演示时效果很好，但生产环境调试很痛苦：
+
+| 问题 | 为什么重要 |
+|------|-----------|
+| "昨天还能跑，今天怎么了？" | 没有对比能力，调试只能靠猜 |
+| "日志说成功了，但输出在哪？" | 没有产物的成功其实是失败 |
+| "哪里出错了？" | 需要知道：路由？执行？验证？ |
+
+**这个工具让这些问题变得可回答。**
+
+每次运行都会产生结构化证据，你可以查询、对比、采取行动——而不是在原始日志里找不同。
+
+---
+
+## 工作原理（架构）
+
+```mermaid
+flowchart TB
+    subgraph Input["输入层"]
+        CLI["命令行<br/>run / inspect / archive / demo"]
+        Quickstart["quickstart.py<br/>一键体验"]
+    end
+
+    subgraph Runtime["运行时层"]
+        Task["任务执行器"]
+        Exec["执行器<br/>运行实际任务"]
+        Verify["验证器<br/>检查结果"]
+    end
+
+    subgraph Evidence["证据层（归档）"]
+        direction TB
+        M["manifest.json<br/>任务请求"]
+        V["verification_report.json<br/>验证结果"]
+        F["failure_signature.json<br/>失败原因"]
+        T["execution_trace.jsonl<br/>执行轨迹"]
+    end
+
+    subgraph Query["查询层"]
+        L["--latest<br/>查看最新"]
+        C["--compare<br/>对比两次"]
+        S["--summary<br/>趋势摘要"]
+    end
+
+    CLI --> Task
+    Quickstart --> Task
+    Task --> Exec
+    Task --> Verify
+    Exec --> Evidence
+    Verify --> Evidence
+    Evidence --> Query
 ```
 
-### 第一次运行会看到什么
+**核心设计原则：**
 
-对于 `ping` 任务，你应该看到：
+1. **归档优先**：证据是一等公民，不是事后补充
+2. **运行时保守**：执行路径保持精简、可诊断
+3. **无隐藏控制流**：评估和对比不会悄悄改变运行方式
+4. **仅标准库**：核心系统零运行时依赖
 
-- 一次成功的 `run` 返回
-- 一个新的 `run_id`
-- 一份可读的 `archive --latest` 归档摘要
+---
 
-第一次体验时，建议先看 `archive --latest`，不要一上来就盯着完整 `run` JSON。
+## 当前状态
 
-## 适合谁
+**公开测试版（Public Alpha）** — 核心功能稳定，上手体验持续优化中。
 
-这个项目更适合：
+### 已可用
 
-- 在做 AI Agent runtime 质量问题的人
-- 关心回归诊断和可复盘性的开发者
-- 想先把 run-level evidence 做扎实，再扩系统边界的团队
-- 想研究 Agent 如何变得更可诊断、更可治理的人
+- ✅ 单任务命令行执行
+- ✅ 顺序批处理执行
+- ✅ 自动归档每次运行的结构化证据
+- ✅ 浏览：最新运行、指定 ID、筛选列表
+- ✅ 对比：任意两次运行的并排差异
+- ✅ 摘要：跨运行的聚合趋势
+- ✅ 291 项测试通过
+- ✅ 真实场景验证：成功、失败、治理审查、代码产物
 
-它现在还不适合普通终端用户直接拿来当成熟产品使用。
+### 尚未实现
 
-## 文档索引
+- ❌ Web 界面（目前用命令行）
+- ❌ 数据库后端（目前用文件系统）
+- ❌ 异步工作器（目前顺序执行）
+- ❌ 托管服务（本地工具）
 
-如果你想继续往下看，建议从这些文档开始：
+这些是故意推迟的，直到核心归档流程在真实使用中得到验证。
 
-- [项目架构、进展与路线图](PROJECT_ARCHITECTURE_STATUS_AND_ROADMAP.md)
-- [真实开发场景的 archive smoke test](docs/2026-04-02-archive-real-dev-smoke-test.md)
-- [外部 UAT 快速开始](docs/2026-04-02-external-uat-quickstart.md)
-- [M3 硬验收清单](docs/2026-04-02-m3-hard-acceptance-checklist.md)
-- [真实使用日记模板](docs/2026-04-02-real-usage-diary-template.md)
-- [项目背景与范式文档](docs/background/README.md)
+---
 
-## 路线图
+## 适合谁用
 
-接下来优先做的事很明确：
+**适合：**
+- 构建 AI Agent 并需要调试运行失败或行为差异
+- 希望在扩展基础设施前先落实运行级证据
+- 更关心"我能否解释发生了什么"而不是"看起来是否 impressive"
+- 喜欢把一件事做好的工具，而不是什么都做的平台
 
-1. 继续降低首次上手门槛
-2. 收集更多公开 alpha 测试反馈
-3. 继续提高 archive 输出的信噪比
-4. 用真实使用日记替代继续空转写架构
-5. 在 repeated-use 被证明之前，继续保持 runtime 边界稳定
+**不适合：**
+- 需要一个完整终端产品的用户
+- 想要托管 API 服务
+- 需要企业功能（认证、多租户等）
 
-## Public Alpha 说明
+---
 
-如果你愿意测试这个仓库，最有价值的反馈不是“看起来很酷”。
+## 项目路线图
 
-真正有用的反馈是：
+```mermaid
+timeline
+    title 开发路线图
+    
+    section 当前（公开测试版）
+        核心循环 : 任务执行
+                 : 归档证据
+                 : 浏览与对比
+                 : 快速上手
+                 
+    section 下一步（反馈阶段）
+        打磨 : 外部测试者反馈
+             : 文档完善
+             : 归档体验优化
+             
+    section 后期
+        扩展 : 更多任务类型
+             : 高级筛选
+             : 批处理优化
+             
+    section 未来
+        平台化 : 可选 API 层
+               : 可插拔存储
+               : 可选 Web 界面
+```
 
-- 你卡在哪一步
-- 哪些输出读起来费劲
-- `compare` 有没有真的帮助你判断问题
-- archive 浏览有没有帮你节省时间
+近期优先事项：
 
-这也是这个项目当前最核心的优化方向。
+1. **降低首次上手门槛** ← 当前阶段
+2. 收集公开测试反馈
+3. 提高归档信噪比
+4. 积累真实使用模式
+5. 在使用证明归档循环有效前，保持运行时边界稳定
+
+---
+
+## 文档
+
+- [快速开始指南](docs/2026-04-02-external-uat-quickstart.md) – 一步步首次运行
+- [测试者反馈清单](docs/2026-04-12-external-feedback-checklist.md) – 测试时注意什么
+- [架构与路线图](PROJECT_ARCHITECTURE_STATUS_AND_ROADMAP.md) – 深入阅读
+- [使用日记模板](docs/2026-04-02-real-usage-diary-template.md) – 记录你的体验
+
+---
+
+## 欢迎反馈
+
+在测试这个工具？最有价值的反馈：
+
+- 你在哪里卡住了？
+- 哪些输出让你困惑？
+- `compare` 真的帮助你理解差异了吗？
+- 你会在实际工作中使用它吗？
+
+[提交 Issue](https://github.com/quzhiii/archive-first-harness/issues) 或参考[反馈清单](docs/2026-04-12-external-feedback-checklist.md)。
+
+---
+
+<div align="center">
+
+**[⬆ 回到顶部](#archive-first-harness)**
+
+</div>

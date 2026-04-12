@@ -2,278 +2,307 @@
 
 <div align="center">
 
-**An archive-first runtime harness for AI agents that need to be diagnosable, comparable, and governable.**
+**Debug AI agent runs with evidence, not guesswork.**
 
 [![Python](https://img.shields.io/badge/python-3.13.2-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Stage](https://img.shields.io/badge/stage-public%20alpha-1f6feb)](#current-status)
-[![Focus](https://img.shields.io/badge/focus-archive--first-111111)](#why-this-project-exists)
 [![Tests](https://img.shields.io/badge/tests-291%20passed-brightgreen)](#validation)
 
 [**中文文档**](README.zh-CN.md) | [English](README.md)
-
-[Quick Start](#quick-start) • [Why This Project Exists](#why-this-project-exists) • [What Makes It Different](#what-makes-it-different) • [Architecture](#architecture) • [Validation](#validation) • [Roadmap](#roadmap)
 
 </div>
 
 ---
 
-## What This Is
+## What This Does
 
-`archive-first-harness` is not trying to be a full AI agent platform on day one.
+**See exactly what your AI agent did and why—without digging through raw logs.**
 
-It is a deliberately narrow runtime harness built around one hard engineering question:
+When your AI agent runs a task, this tool automatically captures a structured record of:
+- What input was given
+- How it was executed step by step  
+- Whether verification passed or failed
+- What artifacts were produced
+- Where and why it failed (if it did)
 
-**when an agent run succeeds, fails, or regresses, can you explain why with evidence instead of intuition?**
+You can then:
+- **Browse** the latest run with a human-readable summary
+- **Compare** two runs to see exactly what changed
+- **Filter** runs by task type, status, or failure class
 
-The current answer is an archive-first execution model:
+Think of it as a **flight recorder for AI agents**: lightweight, always on, and designed for debugging real issues rather than polishing demos.
 
-- keep the runtime chain conservative
-- persist structured evidence for every run
-- make runs readable and comparable after the fact
-- improve the system through diagnostics instead of demo impressions
+```mermaid
+flowchart TB
+    subgraph Traditional["❌ Traditional Debugging"]
+        T1[Run Task] --> T2[Check Logs]
+        T2 --> T3[Guess What Changed]
+        T3 --> T4[Run Again]
+        T4 --> T2
+    end
 
-If you care more about repeatability, verification, and run-level evidence than about surface-level autonomy, this is the problem this repository is solving.
-
-## Why This Project Exists
-
-Many agent systems can look impressive in a demo but become hard to reason about in real work.
-
-Typical questions are surprisingly hard to answer:
-
-| Question | Why it matters |
-|---|---|
-| Why did this run fail? | Failure without localization is not actionable. |
-| Where did it fail? | You need to know whether the issue was routing, execution, verification, or governance. |
-| Why is this run worse than the previous one? | Without comparison, optimization becomes guesswork. |
-| Did the run actually produce the expected artifact? | "Looks successful" is not enough. |
-| What should be changed next? | Improvement needs evidence, not vibes. |
-
-This repository exists to make those questions answerable.
-
-## What Makes It Different
-
-### 1. Archive-first, not demo-first
-
-Each run is treated as an engineering event that should remain inspectable after execution.
-
-### 2. Diagnostic evidence is a first-class output
-
-Runs can persist structured files under `artifacts/runs/<run_id>/`, including:
-
-- `manifest.json`
-- `verification_report.json`
-- `failure_signature.json`
-- `execution_trace.jsonl`
-- `final_output.json`
-
-### 3. It supports a practical comparison loop
-
-The current working loop is:
-
-`run -> latest -> browse -> run-id -> compare`
-
-That loop is much more useful in practice than reading raw JSON and guessing what changed.
-
-### 4. The runtime core stays conservative
-
-The project does not let evaluation or comparison silently turn into an opaque control plane. The execution path remains intentionally narrow and diagnosable.
-
-### 5. Scope is intentionally constrained
-
-This repository is delaying platform expansion on purpose. No database layer, no async worker system, no plugin marketplace, no premature multi-agent orchestration.
-
-## Architecture
-
-The current architecture is organized around a stable runtime core plus an evidence layer.
-
-| Layer | Responsibility |
-|---|---|
-| `entrypoints/` | CLI surface, task runner, batch runner, history helpers, archive helpers |
-| `runtime/` | Orchestrator, executor, verifier, routing, governance handoff |
-| `harness/` | State, contracts, context, tools, journal, telemetry, evaluation plumbing |
-| `planner/` | Task-contract and planning helpers |
-| `tests/` | Unit, smoke, archive, history, and integration coverage |
-
-### Runtime Flow
-
-`request -> input normalization -> task contract -> state/context -> execution -> verification -> governance -> rollback when needed -> journal -> telemetry -> evaluation inputs`
-
-### Archive Flow
-
-`run -> write_run_archive(...) -> artifacts/runs/<run_id>/ -> archive --latest / --run-id / --compare-run-id`
-
-### Design Principle
-
-The system is trying to become a reliable substrate first, not a large platform first.
-
-## Current Status
-
-This repository is in **public alpha**.
-
-What is already working:
-
-- profile-aware task input normalization
-- single-task CLI execution
-- sequential batch execution
-- append-only history and latest-run lookup
-- archive writing for per-run evidence
-- archive browsing by latest run or specific run id
-- run-to-run comparison for diagnostic review
-
-What is intentionally not done yet:
-
-- hosted API service
-- database-backed search
-- async queue or worker layer
-- plugin ecosystem
-- large-scale multi-agent coordination
-
-## Validation
-
-The current build is not just documented; it has been exercised.
-
-### Verified Results
-
-- Local full test suite: `291` tests passed
-- Real smoke flow validated across success, failure, governance-review, and coding-artifact scenarios
-- `archive --latest`, `archive --run-id`, and `archive --compare-run-id` all verified on real runs
-- External UAT showed the main friction is first-run shell entry, not the archive logic itself
-
-### UAT Takeaway
-
-The most important finding so far is simple:
-
-**the archive loop is already useful, but the first-run experience still needs polishing.**
-
-That is a good alpha-stage problem. It means the bottleneck is onboarding clarity rather than complete architectural failure.
-
-## Quick Start
-
-### Fastest first run
-
-From the repo root:
-
-```bash
-python quickstart.py
+    subgraph ArchiveFirst["✅ Archive-First Approach"]
+        A1[Run Task] --> A2[Auto-save Structured Evidence]
+        A2 --> A3[archive --latest]
+        A3 --> A4[Pinpoint Issue with Evidence]
+        A4 --> A5[Fix & Compare]
+        A5 --> A6[archive --compare to Verify]
+    end
 ```
 
-What it does:
+---
 
-- checks `inspect-state`
-- runs a minimal `ping`
-- immediately shows `archive --latest`
+## Quick Start (30 seconds)
 
-This is the recommended first-run path because it avoids the most common Windows `PYTHONPATH` friction and keeps the raw `run` JSON out of your way until the archive loop is working.
+### Prerequisites
+- Python 3.13+ installed
+- Git
 
-### Environment
-
-- Recommended: Python `3.13.2`
-- Current baseline runtime dependencies: **none**
-- Current testing focus: Windows PowerShell and CMD
-
-### Clone
+### Run This
 
 ```bash
 git clone https://github.com/quzhiii/archive-first-harness.git
 cd archive-first-harness
-```
-
-### PowerShell
-
-```powershell
-$env:PYTHONPATH="."
-python -m entrypoints.cli inspect-state
-python -m entrypoints.cli run --task "ping" --task-type retrieval
-python -m entrypoints.cli archive --latest
-```
-
-Or just:
-
-```powershell
 python quickstart.py
 ```
 
-### CMD
+**What happens:**
+1. Checks system state
+2. Runs a minimal "ping" task  
+3. Shows you a readable summary of what just happened
 
-```cmd
-set PYTHONPATH=.
-python -m entrypoints.cli inspect-state
-python -m entrypoints.cli run --task "ping" --task-type retrieval
-python -m entrypoints.cli archive --latest
-```
+That's it. No setup, no dependencies, no configuration.
 
-Or just:
-
-```cmd
-python quickstart.py
-```
-
-### Expected First Run
-
-For the `ping` task, you should see:
-
-- a successful `run` result
-- a new `run_id`
-- a readable archive summary from `archive --latest`
-
-For first-time evaluation, start with `archive --latest` instead of the full raw `run` output.
-
-### Deterministic demo flow for `compare`
-
-If you want a guaranteed compare pair without creating your own second run first:
+### Try the Demo
 
 ```bash
 python -m entrypoints.cli demo
 ```
 
-That command creates or reuses two clearly labeled demo archives:
+Creates two sample runs (success + failure) so you can immediately try the comparison feature:
 
-- one success-like run
-- one failure-like run
+```bash
+python -m entrypoints.cli archive --compare-run-id demo_success_ping --compare-run-id demo_failure_guardrail
+```
 
-Then use the printed commands to browse or compare them directly.
+---
 
-## Who This Is For
+## Real-World Usage Pattern
 
-This project is a fit for:
+Here's how you actually use this in practice:
 
-- builders working on AI agent runtime quality
-- developers who care about regression diagnosis
-- teams that want run-level evidence before expanding architecture
-- researchers exploring diagnosable and governable agent systems
+```mermaid
+sequenceDiagram
+    participant You as Developer
+    participant CLI as CLI
+    participant Runtime as Agent Runtime
+    participant Archive as Archive Storage
 
-It is not yet aimed at casual end users or production deployment teams.
+    You->>CLI: python -m entrypoints.cli run --task "Research X" --task-type retrieval
+    CLI->>Runtime: Execute task
+    Runtime->>Runtime: Run steps + verify
+    Runtime->>Archive: Save structured evidence<br/>(manifest, verification, failures, artifacts)
+    
+    You->>CLI: archive --latest
+    CLI->>Archive: Read latest run
+    Archive-->>CLI: Human-readable summary
+    CLI-->>You: "Status: success | Task: Research X | Artifacts: report.md"
+    
+    Note over You: Later: something breaks
+    
+    You->>CLI: archive --compare-run-id run_old --compare-run-id run_new
+    CLI->>Archive: Fetch both runs
+    Archive-->>CLI: Diff analysis
+    CLI-->>You: "Verification: passed → failed<br/>Failure class: none → timeout<br/>Artifacts: +report.md"
+```
 
-## Documentation Map
+### Common Commands
 
-Start here if you want the deeper project context:
+```bash
+# Run a task
+python -m entrypoints.cli run --task "Summarize this article" --task-type retrieval
 
-- [Project Architecture, Status, and Roadmap](PROJECT_ARCHITECTURE_STATUS_AND_ROADMAP.md)
-- [Archive Real Dev Smoke Test](docs/2026-04-02-archive-real-dev-smoke-test.md)
-- [External UAT Quickstart](docs/2026-04-02-external-uat-quickstart.md)
-- [M3 Hard Acceptance Checklist](docs/2026-04-02-m3-hard-acceptance-checklist.md)
-- [Real Usage Diary Template](docs/2026-04-02-real-usage-diary-template.md)
-- [Background and Paradigm Notes](docs/background/README.md)
+# View the latest run (human readable)
+python -m entrypoints.cli archive --latest
 
-## Roadmap
+# Find a specific run
+python -m entrypoints.cli archive --run-id 20260411T133512Z_ping_3eef61
+
+# Compare two runs
+python -m entrypoints.cli archive --compare-run-id <id1> --compare-run-id <id2>
+
+# View trends across filtered runs
+python -m entrypoints.cli archive --summary --task-type retrieval
+```
+
+---
+
+## Why This Exists
+
+Most AI agent systems look great in demos but become painful in production:
+
+| Problem | Why It Matters |
+|---------|---------------|
+| "It worked yesterday, what's different now?" | Without comparison, debugging is guesswork |
+| "The logs say it succeeded, but where's the output?" | Success without artifacts is failure in disguise |
+| "Something failed, but where?" | You need to know: routing? execution? verification? |
+
+**This tool makes these questions answerable.**
+
+Every run produces structured evidence you can query, compare, and act on—instead of scrolling through unstructured logs hoping to spot the difference.
+
+---
+
+## How It Works (Architecture)
+
+```mermaid
+flowchart TB
+    subgraph Input["Input Layer"]
+        CLI["CLI Commands<br/>run / inspect / archive / demo"]
+        Quickstart["quickstart.py<br/>One-command onboarding"]
+    end
+
+    subgraph Runtime["Runtime Layer"]
+        Task["Task Runner"]
+        Exec["Executor<br/>Runs the actual task"]
+        Verify["Verifier<br/>Checks outputs"]
+    end
+
+    subgraph Evidence["Evidence Layer (Archive)"]
+        direction TB
+        M["manifest.json<br/>What was requested"]
+        V["verification_report.json<br/>Did it pass checks"]
+        F["failure_signature.json<br/>Why it failed"]
+        T["execution_trace.jsonl<br/>Step-by-step log"]
+    end
+
+    subgraph Query["Query Layer"]
+        L["--latest<br/>View newest"]
+        C["--compare<br/>Diff two runs"]
+        S["--summary<br/>Aggregated trends"]
+    end
+
+    CLI --> Task
+    Quickstart --> Task
+    Task --> Exec
+    Task --> Verify
+    Exec --> Evidence
+    Verify --> Evidence
+    Evidence --> Query
+```
+
+**Key design principles:**
+
+1. **Archive-first**: Evidence is a first-class output, not an afterthought
+2. **Conservative runtime**: The execution path stays narrow and diagnosable
+3. **No hidden control flow**: Evaluation and comparison don't silently change how things run
+4. **Standard library only**: Zero runtime dependencies for the core system
+
+---
+
+## Current Status
+
+**Public Alpha** – Core functionality is solid, onboarding is actively improving.
+
+### What's Working
+
+- ✅ Single-task CLI execution
+- ✅ Sequential batch execution  
+- ✅ Automatic per-run archival with structured evidence
+- ✅ Browse: latest run, specific run ID, filtered lists
+- ✅ Compare: side-by-side diff of any two runs
+- ✅ Summary: aggregate trends across runs
+- ✅ 291 tests passing
+- ✅ Verified on real tasks: success, failure, governance review, coding artifacts
+
+### What's Not Here Yet
+
+- ❌ Web UI (use CLI for now)
+- ❌ Database backend (filesystem only)
+- ❌ Async workers (sequential execution)
+- ❌ Hosted service (local tool)
+
+These are intentionally delayed until the core archive loop is proven in real use.
+
+---
+
+## Who Should Use This
+
+**Good fit if you:**
+- Build AI agents and need to debug why runs fail or behave differently
+- Want run-level evidence before building bigger infrastructure
+- Care more about "can I explain what happened" than "does it look impressive"
+- Prefer tools that do one thing well over platforms that do everything
+
+**Not a fit if you:**
+- Need a complete end-user product today
+- Want a hosted API service
+- Require enterprise features (auth, multi-tenant, etc.)
+
+---
+
+## Project Roadmap
+
+```mermaid
+timeline
+    title Development Roadmap
+    
+    section Now (Public Alpha)
+        Core Loop : Task execution
+                  : Archive evidence
+                  : Browse & compare
+                  : Quickstart onboarding
+                  
+    section Next (Feedback Phase)
+        Polish : External tester feedback
+               : Documentation refinement
+               : Archive UX improvements
+               
+    section Later
+        Expand : Additional task types
+               : Advanced filtering
+               : Batch optimizations
+               
+    section Future
+        Platform : Optional API layer
+                 : Pluggable storage
+                 : Optional web UI
+```
 
 Near-term priorities are concrete:
 
-1. reduce first-run friction for external testers
-2. collect more public alpha usage feedback
-3. improve archive signal-to-noise ratio
-4. accumulate real usage diaries instead of more architectural speculation
-5. hold the runtime boundary steady until repeated use proves the archive loop
+1. **Reduce first-run friction** ← you are here
+2. Collect public alpha feedback
+3. Improve archive signal-to-noise ratio
+4. Accumulate real usage patterns
+5. Keep runtime boundary stable until usage proves the archive loop
 
-## Public Alpha Note
+---
 
-If you test this repository, the most valuable feedback is not "looks cool."
+## Documentation
 
-The best feedback is:
+- [Quick Start Guide](docs/2026-04-02-external-uat-quickstart.md) – Step-by-step first run
+- [Tester Feedback Checklist](docs/2026-04-12-external-feedback-checklist.md) – What to look for when testing
+- [Architecture & Roadmap](PROJECT_ARCHITECTURE_STATUS_AND_ROADMAP.md) – Deep dive
+- [Real Usage Diary Template](docs/2026-04-02-real-usage-diary-template.md) – Track your experience
 
-- where you got stuck
-- what output felt confusing
-- whether `compare` changed your diagnosis
-- whether archive browsing actually saved time
+---
 
-That is the feedback loop this project is built around.
+## Feedback Welcome
+
+Testing this? The most valuable feedback:
+
+- Where did you get stuck?
+- Which output was confusing?
+- Did `compare` actually help you understand a difference?
+- Would you use this in your actual workflow?
+
+[Open an issue](https://github.com/quzhiii/archive-first-harness/issues) or reference the [feedback checklist](docs/2026-04-12-external-feedback-checklist.md).
+
+---
+
+<div align="center">
+
+**[⬆ Back to Top](#archive-first-harness)**
+
+</div>

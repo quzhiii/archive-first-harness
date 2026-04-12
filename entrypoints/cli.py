@@ -11,6 +11,7 @@ from entrypoints.archive_browse import (
     find_run_archive,
     format_archive_brief,
     read_latest_run_archive,
+    summarize_run_archives,
 )
 from entrypoints.batch_export import BatchExportOptions, export_batch_results
 from entrypoints.batch_runner import load_batch_request_file, run_batch_request
@@ -103,6 +104,7 @@ def main(argv: list[str] | None = None) -> int:
                 archive_command(
                     settings,
                     archive_root=args.archive_root,
+                    summary=bool(args.summary),
                     latest=bool(args.latest),
                     run_id=args.run_id,
                     compare_run_ids=list(args.compare_run_id or []),
@@ -275,6 +277,7 @@ def archive_command(
     settings,
     *,
     archive_root: str | None = None,
+    summary: bool = False,
     latest: bool = False,
     run_id: str | None = None,
     compare_run_ids: list[str] | None = None,
@@ -286,6 +289,16 @@ def archive_command(
     limit: int | None = None,
 ) -> str:
     resolved_archive_root = str(archive_root or (settings.artifacts_dir / "runs"))
+    if summary:
+        payload = summarize_run_archives(
+            resolved_archive_root,
+            workflow_profile_id=workflow_profile_id,
+            task_type=task_type,
+            formation_id=formation_id,
+            status=status,
+            failure_class=failure_class,
+        )
+        return format_archive_brief(payload)
     if latest:
         payload = read_latest_run_archive(resolved_archive_root)
         return format_archive_brief(payload)
@@ -472,6 +485,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--archive-root",
         dest="archive_root",
         help="Path to artifacts/runs. Defaults to <artifacts-dir>/runs.",
+    )
+    archive_parser.add_argument(
+        "--summary",
+        dest="summary",
+        action="store_true",
+        help="Show aggregate archive trend summary for the current filters.",
     )
     archive_parser.add_argument(
         "--latest",
@@ -690,6 +709,7 @@ def _validate_archive_args(args) -> None:
     if limit is not None and limit < 0:
         raise ValueError("--limit must be non-negative")
 
+    summary = bool(getattr(args, "summary", False))
     latest = bool(getattr(args, "latest", False))
     compare_run_ids = [
         item
@@ -698,6 +718,12 @@ def _validate_archive_args(args) -> None:
     ]
     run_id = getattr(args, "run_id", None)
 
+    if summary and latest:
+        raise ValueError("--summary cannot be combined with --latest")
+    if summary and run_id:
+        raise ValueError("--summary cannot be combined with --run-id")
+    if summary and compare_run_ids:
+        raise ValueError("--summary cannot be combined with --compare-run-id")
     if latest and run_id:
         raise ValueError("--latest cannot be combined with --run-id")
     if latest and compare_run_ids:

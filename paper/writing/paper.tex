@@ -1,6 +1,9 @@
 \documentclass[11pt]{article}
 
-\usepackage[margin=1in]{geometry}
+% ---- ACL official style (EMNLP 2026) ----
+\usepackage{acl}
+
+% ---- Packages not already loaded by acl.sty ----
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
@@ -9,21 +12,12 @@
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{graphicx}
-\usepackage{xcolor}
-\usepackage{hyperref}
 \usepackage{enumitem}
 \usepackage{float}
 \usepackage{tikz}
 \usetikzlibrary{positioning, arrows.meta, shapes.geometric, calc, fit, backgrounds}
 
-\hypersetup{
-  colorlinks=true,
-  linkcolor=blue,
-  citecolor=blue,
-  urlcolor=blue,
-  pdftitle={archive-first-harness: A Local-First Evidence Layer for Diagnosing AI Agent Failures},
-}
-
+% ---- Paper metadata ----
 \title{archive-first-harness: A Local-First Evidence Layer\\for Diagnosing AI Agent Failures}
 
 \author{
@@ -31,8 +25,6 @@
   Tsinghua University \\
   \texttt{qz23@mails.tsinghua.edu.cn}
 }
-
-\date{}
 
 \begin{document}
 
@@ -54,69 +46,35 @@ We argue that this gap motivates a distinct layer in the agent stack: an \textbf
 
 The key design choice is to optimize for diagnosis rather than monitoring. Monitoring tools are excellent for observing many runs; an evidence layer is optimized for explaining why a specific pair of runs diverged. This difference matters in practice. A long trace may show everything that happened, but a useful debugging primitive should reveal what changed in a way that matters. archive-first-harness therefore aims to sit between observability and debugging: more structured than raw tracing, but lighter-weight and more local than a hosted experiment platform.
 
-This paper makes four contributions:
-
-\begin{enumerate}[leftmargin=1.5em]
-  \item \textbf{Conceptual contribution.} We articulate the \textbf{Agent Evidence Layer} as a missing layer in the agent tooling stack, distinct from frameworks, harnesses, observability systems, and evaluators.
-  \item \textbf{System contribution.} We design a structured archive schema and a comparison model for agent runs, centered on stage-aware debugging across routing, execution, verification, and governance-relevant outcomes.
-  \item \textbf{Implementation contribution.} We implement a zero-dependency local CLI tool that supports archive creation, browsing, and run-to-run comparison using product-facing interfaces rather than research-only code paths.
-  \item \textbf{Empirical contribution.} We provide initial empirical evidence through real AgentRx failure-to-stage mapping, deterministic case-study pipelines, information density quantification, and a blind LLM proxy evaluation across two frontier models.
-\end{enumerate}
-
-Our goal is not to claim that archive-first-harness fully solves agent debugging. Rather, we aim to show that an explicit evidence layer is both practically implementable and empirically useful enough to merit a distinct place in the agent stack.
+This paper makes four contributions: (\textbf{1})~a conceptual articulation of the \textbf{Agent Evidence Layer} as a missing layer distinct from frameworks, harnesses, and observability systems; (\textbf{2})~a structured archive schema and stage-aware comparison model; (\textbf{3})~a zero-dependency local CLI implementation; and (\textbf{4})~empirical evidence through AgentRx failure-to-stage mapping, deterministic case-study pipelines, information-density quantification, and a blind LLM proxy evaluation.
 
 \section{Related Work}
 
 \subsection{Agent failure diagnosis and trajectory analysis}
 
-Recent work has begun to study AI agent failure more directly. \textbf{AgentRx} frames agent debugging as a root-cause attribution problem and provides a labeled benchmark of failed trajectories~\cite{barke2026agentrx}. This line of work is valuable because it treats failure analysis as a first-class research problem rather than a byproduct of evaluation. Related trajectory-analysis efforts include Zhu et al.~\cite{zhu2025agentdebug}, which introduce a modular failure taxonomy and a debugging framework for isolating root causes across planning, tool use, and memory; \textbf{AgentTracer}~\cite{li2025agentracer}, which automates failure annotation via counterfactual replay; \textbf{TRAIL}~\cite{rao2025trail}, which localizes reasoning and agentic issues in execution traces; and \textbf{DoVer}~\cite{ma2025dover}, which takes an intervention-driven approach to validating failure hypotheses in multi-agent systems. Interactive tools such as \textbf{AGDebugger}~\cite{epperson2025debugging} enable rewind-edit-re-execute workflows for multi-agent traces, while \textbf{AgentDiagnose}~\cite{ou2025agentdiagnose} provides an open diagnostic toolkit that quantifies agentic competencies such as task decomposition and self-verification. The \textbf{MAST} study~\cite{cemri2025mast} catalogs why multi-agent systems fail in practice, and failure attribution work such as Who\&When~\cite{zhang2025whowhen} and RAFFLES~\cite{raffles2025} targets the identification of responsible agents and steps.
+Recent work treats agent failure as a first-class research problem. \textbf{AgentRx}~\cite{barke2026agentrx} provides a labeled benchmark of failed trajectories framed as root-cause attribution; Zhu et al.~\cite{zhu2025agentdebug} introduce a modular failure taxonomy; \textbf{AgentTracer}~\cite{li2025agentracer} automates failure annotation via counterfactual replay; \textbf{TRAIL}~\cite{rao2025trail} localizes reasoning issues in traces; and \textbf{DoVer}~\cite{ma2025dover} takes an intervention-driven approach to multi-agent debugging. Interactive tools such as \textbf{AGDebugger}~\cite{epperson2025debugging} support rewind-edit-re-execute workflows; \textbf{AgentDiagnose}~\cite{ou2025agentdiagnose} quantifies agentic competencies; and \textbf{MAST}~\cite{cemri2025mast} catalogs why multi-agent systems fail in practice.
 
-Our work differs in emphasis. These systems are primarily \textbf{post-hoc analytic frameworks} over benchmarked or collected trajectories. By contrast, archive-first-harness is designed as a \textbf{runtime-adjacent, local-first system primitive}: it writes structured evidence during normal usage and supports direct run-to-run comparison in a product workflow. In other words, AgentRx and related tools help us understand failure taxonomies; archive-first-harness focuses on operationalizing diagnosis for everyday debugging.
+These systems are primarily \textbf{post-hoc analytic frameworks} over benchmarked trajectories. By contrast, archive-first-harness is a \textbf{runtime-adjacent, local-first primitive} that writes structured evidence during normal usage and supports direct run-to-run comparison.
 
 \subsection{Observability, tracing, and evaluation platforms}
 
-Platforms such as \textbf{LangSmith}~\cite{langsmith}, \textbf{Braintrust}~\cite{braintrust}, and \textbf{Langfuse}~\cite{langfuse} provide tracing, monitoring, experiment views, and evaluation infrastructure for LLM applications and agents. These systems are highly useful for observability and aggregate inspection. However, their design center is typically broader than local debugging. They record runs, surface traces, and organize experiments, but they are not primarily built around a compact, stage-oriented evidence bundle with explicit run-to-run diffs over artifacts, verification, governance, and follow-up state.
+Platforms such as \textbf{LangSmith}~\cite{langsmith}, \textbf{Braintrust}~\cite{braintrust}, and \textbf{Langfuse}~\cite{langfuse} provide tracing, monitoring, and evaluation infrastructure for LLM applications. Complementary benchmarks stress-test agent capabilities: \textbf{WebArena}~\cite{zhou2024webarena}, \textbf{OSWorld}~\cite{xie2024osworld}, \textbf{GAIA}~\cite{mialon2024gaia}, \textbf{AgentBench}~\cite{liu2024agentbench}, and SWE-bench~\cite{jimenez2024swebench}. We view archive-first-harness as complementary: tracing answers \emph{what happened}, benchmarks answer \emph{how well}, while an evidence layer answers \emph{what materially changed}.
 
-Complementary research on agent evaluation has produced benchmarks that stress-test agent capabilities in realistic settings, including \textbf{WebArena}~\cite{zhou2024webarena} for web-based tasks, \textbf{OSWorld}~\cite{xie2024osworld} for desktop automation, \textbf{GAIA}~\cite{mialon2024gaia} for general assistant reasoning, and \textbf{AgentBench}~\cite{liu2024agentbench} for multi-environment evaluation. While these benchmarks measure end-task success, they do not provide structured diagnosis of \emph{why} one run differs from another. Root-cause analysis for LLM-based systems has also been explored in software engineering contexts~\cite{roy2024rca}.
+\subsection{Positioning: Evidence Layer vs.\ adjacent layers}
 
-We do not position archive-first-harness as a replacement for these platforms or benchmarks. Instead, we view it as complementary: tracing answers \emph{what happened}, benchmarks answer \emph{how well the agent performs}, while an evidence layer answers \emph{what materially changed}.
-
-\subsection{Positioning: Evidence Layer vs. adjacent layers}
-
-The core positioning claim of this paper is that there is a missing layer between observability and debugging:
-
-\begin{itemize}[leftmargin=1.5em]
-  \item \textbf{Frameworks} define how agents are built~\cite{guo2024llm,tran2025multi}.
-  \item \textbf{Harnesses} define how agents are executed~\cite{wang2024openhands}.
-  \item \textbf{Observability systems} show traces, metrics, and runtime events~\cite{langsmith,langfuse,braintrust}.
-  \item \textbf{Evaluation benchmarks} measure agent capability and reliability~\cite{zhou2024webarena,xie2024osworld,jimenez2024swebench,mialon2024gaia,liu2024agentbench}.
-  \item \textbf{Evidence Layer systems} convert runs into stable, comparable evidence artifacts for diagnosis.
-\end{itemize}
-
-This distinction is subtle but important. The Evidence Layer does not need to replace traces, hosted dashboards, evaluators, or diagnostic tooling such as AgentDiagnose~\cite{ou2025agentdiagnose} and DoVer~\cite{ma2025dover}. Its purpose is narrower and more practical: making individual failures easier to compare, localize, and explain. We also note that recent surveys on agentic LLMs~\cite{plaat2025agentic,guo2024llm} have cataloged the growing complexity of agent architectures, which further motivates dedicated debugging infrastructure.
+There is a missing layer between observability and debugging. \textbf{Frameworks} define how agents are built~\cite{guo2024llm,tran2025multi}; \textbf{Harnesses} define how agents are executed~\cite{wang2024openhands}; \textbf{Observability systems} show traces and runtime events~\cite{langsmith,langfuse,braintrust}; \textbf{Evaluation benchmarks} measure capability~\cite{zhou2024webarena,xie2024osworld,jimenez2024swebench,mialon2024gaia,liu2024agentbench}; \textbf{Evidence Layer systems} convert runs into stable, comparable evidence artifacts for diagnosis. The Evidence Layer does not replace these tools; its purpose is narrower: making individual failures easier to compare, localize, and explain.
 
 \section{System}
 
 \subsection{The Evidence Layer abstraction}
 
-archive-first-harness is built around a simple idea: every run should leave behind a compact, structured archive that is small enough to inspect and rich enough to compare. The system therefore treats a run not as a raw trace alone, but as a bundle of evidence spanning task contract, execution result, verification, evaluation, follow-up, and artifact production.
+archive-first-harness is built around a simple idea: every run should leave behind a compact, structured archive that is small enough to inspect and rich enough to compare. We position this as an \textbf{Evidence Layer} in the agent stack (Figure~\ref{fig:stack}): frameworks build agents, harnesses run them, observability traces them, and the Evidence Layer archives and compares runs for diagnosis. The abstraction requires no new model behavior, no hosted backend, and no specialized instrumentation---only stable JSON/JSONL outputs and a local archive root.
 
-We position this as an \textbf{Evidence Layer} in the stack:
-
-\begin{itemize}[leftmargin=1.5em]
-  \item Framework: build agents
-  \item Harness: run agents
-  \item Observability: trace and monitor agents
-  \item \textbf{Evidence Layer}: archive and compare runs for diagnosis
-\end{itemize}
-
-The abstraction is intentionally modest. It does not require new model behavior, a hosted backend, or specialized instrumentation infrastructure. Instead, it relies on stable JSON/JSONL outputs and a local archive root.
-
-\begin{figure}[H]
+\begin{figure*}[t!]
   \centering
   \begin{tikzpicture}[
     layer/.style={
-      draw, rounded corners=3pt, minimum width=11cm, minimum height=1.1cm,
+      draw, rounded corners=3pt, minimum width=8.5cm, minimum height=0.9cm,
       font=\small, align=center, thick
     },
     arr/.style={-{Stealth[length=5pt]}, thick, gray!70},
@@ -124,10 +82,10 @@ The abstraction is intentionally modest. It does not require new model behavior,
   ]
     % Layers (bottom to top)
     \node[layer, fill=blue!8]    (fw)  at (0, 0)   {\textbf{Framework Layer}\\LangGraph, CrewAI, AutoGen};
-    \node[layer, fill=teal!8]    (hn)  at (0, 1.5)  {\textbf{Harness Layer}\\OpenHands, Aider, Agent-As-Tool};
-    \node[layer, fill=orange!8]  (obs) at (0, 3.0)  {\textbf{Observability Layer}\\LangSmith, Langfuse, Braintrust};
+    \node[layer, fill=teal!8]    (hn)  at (0, 1.3)  {\textbf{Harness Layer}\\OpenHands, Aider, Agent-As-Tool};
+    \node[layer, fill=orange!8]  (obs) at (0, 2.6)  {\textbf{Observability Layer}\\LangSmith, Langfuse, Braintrust};
     \node[layer, fill=red!12, draw=red!50!black, line width=1.2pt]
-                                 (ev)  at (0, 4.5)  {\textbf{Evidence Layer} (this work)\\archive-first-harness};
+                                 (ev)  at (0, 3.9)  {\textbf{Evidence Layer} (this work)\\archive-first-harness};
 
     % Side labels
     \node[note, right] at (fw.east)  {build agents};
@@ -149,26 +107,22 @@ The abstraction is intentionally modest. It does not require new model behavior,
   \end{tikzpicture}
   \caption{Positioning the Evidence Layer in the agent tooling stack. Existing layers address construction, execution, and monitoring; the Evidence Layer addresses structured run-to-run diagnosis.}
   \label{fig:stack}
-\end{figure}
+\end{figure*}
 
 \subsection{Archive schema}
 
-Each run is archived as a directory containing structured files such as \texttt{manifest.json}, \texttt{task\_contract.json}, \texttt{profile\_and\_mode.json}, \texttt{verification\_report.json}, \texttt{evaluation\_summary.json}, \texttt{failure\_signature.json}, \texttt{final\_output.json}, \texttt{execution\_trace.jsonl}, and \texttt{archive\_index.json}.
+Each run is archived as a directory of structured files: \texttt{manifest.json}, \texttt{task\_contract.json}, \texttt{profile\_and\_mode.json}, \texttt{verification\_report.json}, \texttt{evaluation\_summary.json}, \texttt{failure\_signature.json}, \texttt{final\_output.json}, \texttt{execution\_trace.jsonl}, and \texttt{archive\_index.json}. These files separate concerns: \texttt{failure\_signature.json} answers \emph{where and how} the run failed; \texttt{verification\_report.json} captures whether results met expected criteria; \texttt{final\_output.json} and artifact metadata record what was actually produced.
 
-These files are designed to separate concerns. For example, \texttt{failure\_signature.json} answers \emph{where and how the run failed}, while \texttt{verification\_report.json} captures whether the result met expected criteria, and \texttt{evaluation\_summary.json} records whether a run merits observation or human review. \texttt{final\_output.json} and artifact metadata record what was actually produced, which becomes essential when a run technically completes but omits a required output.
-
-This schema captures more than a binary success/failure label. It allows the system to preserve the expected artifacts for a task, the artifacts actually produced, the stage at which failure occurred, whether verification regressed, whether risk or governance status changed, and whether downstream review became necessary.
+Together, the schema preserves the expected and produced artifacts, the failure stage, whether verification regressed, whether risk changed, and whether governance escalation or human review became necessary---capturing more than a binary success/failure label.
 
 \subsection{Comparison model}
 
-The compare command operates over archived runs rather than raw trajectories. It computes differences across dimensions including failure class and failed stage, verification status, reassessed risk level and reason codes, evaluation recommendation and human-review requirement, governance escalation state, expected artifacts, produced artifacts, and baseline artifact status.
+The compare command operates over archived runs rather than raw trajectories. It computes differences across failure class and stage, verification status, reassessed risk level, evaluation recommendation, governance escalation state, and artifact production. Differences are normalized into transition labels---\texttt{regressed}, \texttt{resolved}, \texttt{unchanged}, \texttt{improved}, \texttt{cleared}---producing a concise diagnostic surface (Figure~\ref{fig:compare}).
 
-These differences are normalized into transition labels such as \texttt{regressed}, \texttt{resolved}, \texttt{unchanged}, \texttt{improved}, and \texttt{cleared}. This produces a concise diagnostic surface. Instead of manually reading two traces line-by-line, a developer can quickly see that a run regressed in \textbf{verification}, \textbf{artifacts}, and \textbf{evaluation}, while governance remained unchanged.
-
-\begin{figure}[H]
+\begin{figure*}[t!]
   \centering
   \begin{tikzpicture}[
-    box/.style={draw, rounded corners=2pt, minimum width=4.2cm, minimum height=0.7cm,
+    box/.style={draw, rounded corners=2pt, minimum width=4.0cm, minimum height=0.65cm,
                 font=\scriptsize, align=center, thick},
     arrow/.style={-{Stealth[length=4pt]}, thick},
     label/.style={font=\scriptsize\bfseries},
@@ -176,27 +130,27 @@ These differences are normalized into transition labels such as \texttt{regresse
                   inner sep=2pt}
   ]
     % Left run
-    \node[label] (ltitle) at (-3.3, 3.8) {Run A (success)};
-    \node[box, fill=green!10]  (lf) at (-3.3, 3.0) {status: \texttt{success}};
-    \node[box, fill=green!10]  (lv) at (-3.3, 2.1) {verification: \texttt{passed}};
-    \node[box, fill=green!10]  (lr) at (-3.3, 1.2) {risk: \texttt{low}};
-    \node[box, fill=green!10]  (le) at (-3.3, 0.3) {eval: \texttt{keep}};
-    \node[box, fill=green!10]  (la) at (-3.3,-0.6) {artifacts: \texttt{answer,}\\\texttt{retrieval\_report}};
+    \node[label] (ltitle) at (-3.2, 3.4) {Run A (success)};
+    \node[box, fill=green!10]  (lf) at (-3.2, 2.7) {status: \texttt{success}};
+    \node[box, fill=green!10]  (lv) at (-3.2, 1.9) {verification: \texttt{passed}};
+    \node[box, fill=green!10]  (lr) at (-3.2, 1.1) {risk: \texttt{low}};
+    \node[box, fill=green!10]  (le) at (-3.2, 0.3) {eval: \texttt{keep}};
+    \node[box, fill=green!10]  (la) at (-3.2,-0.5) {artifacts: \texttt{answer,}\\\texttt{retrieval\_report}};
 
     % Right run
-    \node[label] (rtitle) at (3.3, 3.8) {Run B (failure)};
-    \node[box, fill=red!10]  (rf) at (3.3, 3.0) {status: \texttt{failed}};
-    \node[box, fill=red!10]  (rv) at (3.3, 2.1) {verification: \texttt{failed}};
-    \node[box, fill=red!10]  (rr) at (3.3, 1.2) {risk: \texttt{high}};
-    \node[box, fill=red!10]  (re) at (3.3, 0.3) {eval: \texttt{observe}};
-    \node[box, fill=red!10]  (ra) at (3.3,-0.6) {artifacts: \texttt{answer}\\(\emph{missing} retrieval\_report)};
+    \node[label] (rtitle) at (3.2, 3.4) {Run B (failure)};
+    \node[box, fill=red!10]  (rf) at (3.2, 2.7) {status: \texttt{failed}};
+    \node[box, fill=red!10]  (rv) at (3.2, 1.9) {verification: \texttt{failed}};
+    \node[box, fill=red!10]  (rr) at (3.2, 1.1) {risk: \texttt{high}};
+    \node[box, fill=red!10]  (re) at (3.2, 0.3) {eval: \texttt{observe}};
+    \node[box, fill=red!10]  (ra) at (3.2,-0.5) {artifacts: \texttt{answer}\\(\emph{missing} retrieval\_report)};
 
     % Transition labels (center)
-    \node[trans] at (0, 3.0) {\texttt{regressed}};
-    \node[trans] at (0, 2.1) {\texttt{regressed}};
-    \node[trans] at (0, 1.2) {\texttt{regressed}};
+    \node[trans] at (0, 2.7) {\texttt{regressed}};
+    \node[trans] at (0, 1.9) {\texttt{regressed}};
+    \node[trans] at (0, 1.1) {\texttt{regressed}};
     \node[trans] at (0, 0.3) {\texttt{regressed}};
-    \node[trans] at (0,-0.6) {\texttt{missing artifact}};
+    \node[trans] at (0,-0.5) {\texttt{missing artifact}};
 
     % Arrows left -> right
     \draw[arrow, gray!60] (lf.east) -- (rf.west);
@@ -206,9 +160,9 @@ These differences are normalized into transition labels such as \texttt{regresse
     \draw[arrow, gray!60] (la.east) -- (ra.west);
 
     % Summary box
-    \node[draw, rounded corners=3pt, fill=gray!5, minimum width=10.8cm,
-          font=\scriptsize, align=left, inner sep=6pt]
-      at (0, -1.8) {%
+    \node[draw, rounded corners=3pt, fill=gray!5, minimum width=10.0cm,
+          font=\scriptsize, align=left, inner sep=5pt]
+      at (0, -1.5) {%
         \textbf{Compare summary:} 5 dimensions compared $\rightarrow$
         4 \texttt{regressed} + 1 \texttt{missing artifact}.
         Governance: \texttt{unchanged}.\\
@@ -218,7 +172,7 @@ These differences are normalized into transition labels such as \texttt{regresse
   \end{tikzpicture}
   \caption{Conceptual layout of the archive comparison output. Each dimension is compared between two archived runs, producing transition labels that summarize the diagnostic surface.}
   \label{fig:compare}
-\end{figure}
+\end{figure*}
 
 \subsection{Local-first CLI workflow}
 
@@ -231,6 +185,8 @@ The demonstration shows the full archive-first debugging loop end-to-end using l
 
 The demo uses the Case B (RAG agent) and Case C (multi-step tool) scenarios from Section~\ref{sec:eval}, which ship as deterministic one-command scripts in the repository. A condensed transcript of a comparison session is shown below:
 
+\begin{figure*}[t!]
+\small
 \begin{verbatim}
 $ python -m entrypoints.cli archive --compare-run-id run_success run_fail
 
@@ -249,13 +205,16 @@ Diagnosis: Run failed at execution stage. Retrieval step was
            skipped; verification and risk cascaded accordingly.
 ============================================================
 \end{verbatim}
+\caption{Example archive comparison session output.}
+\label{fig:demo-verbatim}
+\end{figure*}
 
 The demo highlights two design choices that distinguish archive-first-harness from raw tracing tools: the failure is surfaced as a \emph{named transition} (\texttt{REGRESSED}, \texttt{MISSING}) rather than a raw diff, and the diagnostic summary is generated from structured fields rather than log parsing. Attendees may also run \texttt{python quickstart.py} on their own laptop---the tool requires only the Python standard library and produces the full archive loop in under 30 seconds.
 
 \section{Evaluation and Current Artifacts}
 \label{sec:eval}
 
-This section establishes empirical evidence for the Evidence Layer abstraction through three complementary forms: taxonomy alignment against a public benchmark, realistic case studies with deterministic pipelines, and a quantitative proxy evaluation of diagnostic clarity.
+This section presents three complementary forms of empirical evidence: taxonomy alignment against a public benchmark, realistic case studies with deterministic pipelines, and a quantitative proxy evaluation of diagnostic clarity.
 
 \subsection{AgentRx mapping experiment}
 
@@ -263,7 +222,7 @@ We map AgentRx's root-cause categories into the Evidence Layer stage abstraction
 
 The current real-data pass yields the following mapping. Table~\ref{tab:agentrx-mapping} shows the full category-to-stage mapping with counts per split, and Table~\ref{tab:split-stats} summarizes the split-level stage distribution.
 
-\begin{table}[H]
+\begin{table*}[t!]
   \centering
   \small
   \begin{tabular}{p{5.8cm}lrrr}
@@ -288,9 +247,9 @@ The current real-data pass yields the following mapping. Table~\ref{tab:agentrx-
   \end{tabular}
   \caption{AgentRx root-cause categories mapped to Evidence Layer stages. All 73 annotated failures from the two public splits map without remainder.}
   \label{tab:agentrx-mapping}
-\end{table}
+\end{table*}
 
-\begin{table}[H]
+\begin{table*}[t!]
   \centering
   \begin{tabular}{lrrr}
     \toprule
@@ -305,7 +264,7 @@ The current real-data pass yields the following mapping. Table~\ref{tab:agentrx-
   \end{tabular}
   \caption{Stage distribution across splits. Retail trajectories are routing-dominated; Magentic-One trajectories show a balanced routing/execution split with a distinct governance cluster.}
   \label{tab:split-stats}
-\end{table}
+\end{table*}
 
 At the split level, the retail trajectories are dominated by routing-oriented failures such as underspecified user intent and intent-plan misalignment, while the Magentic-One trajectories show a stronger execution component and a distinct governance cluster caused by guardrail-triggered failures. This matters because it demonstrates that the stage model is not merely a conceptual reframing; it can absorb the released AgentRx labels without leaving an unmapped bucket on the public data.
 
@@ -313,15 +272,78 @@ This experiment is intentionally modest. It does not yet claim superiority over 
 
 \subsection{Case studies}
 
-We organize the case-study portion into three tracks: (1) a repository-grounded coding-agent scenario with a completed archive pair consisting of a real Aider success run and a reduced-scope failure-prone writing sample, (2) a retrieval-augmented generation scenario with a success/failure archive pair, and (3) a multi-step tool-use scenario with a success/failure archive pair.
+We organize three case-study tracks: (A) a coding-agent scenario with a real Aider success run and a reduced-scope failure-prone writing sample; (B) a retrieval-augmented generation scenario; and (C) a multi-step tool-use scenario. Cases B and C ship as deterministic one-command scripts; Case A uses a completed Aider-based archive pair collected through the same archive-facing interfaces.
 
-The current repository already includes deterministic scripts for Cases B and C that generate archives using the same production archive writer as the main system. For Case A, the repository now includes a completed Aider-based archive pair collected through the same archive-facing interfaces. The success run is a repository-grounded real coding-agent edit, while the failure-prone run is a reduced-scope paper excerpt designed to test whether the agent overstates Case A completion under realistic writing conditions. This matters because Case A is now represented in the same compare-ready archive format as the other cases, rather than remaining only a planned ingestion workflow.
+In all three cases the compare view exposes meaningful regressions across multiple dimensions (Table~\ref{tab:case-studies} in Appendix~\ref{app:case-studies}). In Case A, the agent overstates Case A's completion status---a factual-overstatement failure surfaced as regressions in verification and evaluation. In Case B, the failed run emits only \texttt{answer} (missing \texttt{retrieval\_report}), shifting evaluation from \texttt{keep} to \texttt{observe}. In Case C, the failed run loses \texttt{plan\_note} and shifts from success to execution failure with parallel regressions in verification, reassessment, and artifact status.
 
-In Case A, the failure-prone sample shows a concrete factual-overstatement pattern: the agent rewrites the text so that Case A appears to already have a completed success/failure pair, even though the underlying repository state does not support that stronger claim. This provides a realistic comparison point for the archive-first evidence layer because the failure is not a raw crash, but a subtle state-description error that would be easy to miss in ordinary editing workflows.
+\subsection{Quantitative proxy evaluation}
 
-In all three cases, the compare view exposes meaningful regressions across multiple dimensions. Table~\ref{tab:case-studies} summarizes the key comparison dimensions for each case.
+The system ships with A/B study materials for contrasting raw logs versus archive compare outputs---including a moderator script, questionnaire, and score-sheet template. We present two quantitative proxy evaluations below.
 
-\begin{table}[H]
+\paragraph{Information density analysis.}
+We quantify the proportion of each material that directly supports diagnosis---text answering ``which stage failed'' and ``what was the root cause''---relative to total character count. Archive compare materials achieve substantially higher information density (+116\% for S1, +31\% for S2) with fewer inference steps to reach a complete diagnosis (2 steps in both archive conditions vs.\ 3--4 steps in raw log conditions). The gain comes from reduced noise rather than added verbosity (see Table~\ref{tab:info-density} in Appendix~\ref{app:case-studies}).
+
+\paragraph{LLM-as-evaluator (blind).}
+We run a blind proxy evaluation using two frontier models (DeepSeek-Chat and GLM-5.1). Each model receives either the raw log or the archive compare output per scenario without being told which condition it is reading, and is asked to identify the failure stage and root cause. We repeat each condition three times per model ($n{=}6$ per cell). Results are detailed in Table~\ref{tab:llm-eval} (Appendix~\ref{app:case-studies}). Cause attribution is 100\% across all conditions and both models. Stage accuracy is 100\% in three of four conditions. The single exception---S1 archive\_compare stage classified as \texttt{execution} rather than \texttt{verification} (0/6)---reflects a semantic ambiguity discussed in Section~\ref{sec:limitations}.
+
+\section{Limitations and Next Steps}
+\label{sec:limitations}
+
+This work remains an early-stage systems contribution. The proxy evaluation provides quantitative support for the archive format's diagnostic clarity, but a controlled human user study with larger participant numbers remains future work; the proxy results should be read as an initial quantitative baseline.
+
+The LLM proxy evaluation surfaces a \textbf{stage label ambiguity}: for Scenario 1, both frontier models consistently classify the failure stage as \texttt{execution} rather than \texttt{verification} when reading the archive compare output (0/6 correct). The underlying cause is that retrieval strategy degradation is an execution-time behavior, yet the archive schema surfaces it through the verification report. Stage labels for retrieval-specific failures may benefit from an additional sub-label in future schema versions; root cause identification is unaffected.
+
+The system is currently \textbf{CLI-first and single-agent oriented}. The AgentRx mapping establishes coverage and interpretability but not yet downstream benefits such as reduced debugging time. Future work includes a controlled human study, broader coding-agent case studies, and richer trajectory-level analysis over raw benchmark files.
+
+\section{Conclusion}
+
+archive-first-harness argues for an Evidence Layer in agent tooling: a local, structured, comparison-oriented layer between observability and debugging. By turning each run into a compact archive and exposing stage-aware diffs, the system makes it easier to answer a practical question that raw traces alone often leave unresolved: \emph{what materially changed between two runs?}
+
+Our current results show that this idea is already concrete enough to support real-data taxonomy mapping, deterministic case-study comparisons, and quantitative proxy evidence for the archive format's diagnostic clarity. We view this as an argument not only for one tool, but for a broader design principle: agent systems need better evidence surfaces, not just more traces.
+
+\bibliography{references}
+
+
+\appendix
+
+\section{Supporting Tables}
+\label{app:case-studies}
+
+\begin{table*}[t!]
+  \centering
+  \small
+  \begin{tabular}{lrrrr}
+    \toprule
+    \textbf{Material} & \textbf{Total chars} & \textbf{Diagnostic chars} & \textbf{Info density} & \textbf{Inference steps} \\
+    \midrule
+    S1 raw\_logs         & 1,219 & 221 & 18.1\% & 3 \\
+    S1 archive\_compare  & 1,376 & 540 & 39.2\% & 2 \\
+    S2 raw\_logs         & 1,365 & 485 & 35.5\% & 4 \\
+    S2 archive\_compare  & 1,147 & 534 & 46.6\% & 2 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Information density and inference steps for raw log vs.\ archive compare materials across two scenarios.}
+  \label{tab:info-density}
+\end{table*}
+
+\begin{table*}[t!]
+  \centering
+  \small
+  \begin{tabular}{llrrr}
+    \toprule
+    \textbf{Scenario} & \textbf{Condition} & \textbf{Stage acc.} & \textbf{Cause acc.} & \textbf{Mean conf.} \\
+    \midrule
+    S1 & raw\_logs        & 100\% (6/6) & 100\% (6/6) & 4.5 \\
+    S1 & archive\_compare &   0\% (0/6) & 100\% (6/6) & 4.8 \\
+    S2 & raw\_logs        & 100\% (6/6) & 100\% (6/6) & 4.5 \\
+    S2 & archive\_compare & 100\% (6/6) & 100\% (6/6) & 5.0 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Blind LLM proxy evaluation results (DeepSeek-Chat + GLM-5.1, $n{=}6$ per cell). Cause attribution is 100\% across all conditions. The S1 archive\_compare stage misclassification is discussed in Section~\ref{sec:limitations}.}
+  \label{tab:llm-eval}
+\end{table*}
+
+\begin{table*}[t!]
   \centering
   \small
   \begin{tabular}{p{2.8cm}p{3.2cm}p{3.2cm}p{3.2cm}}
@@ -347,82 +369,6 @@ In all three cases, the compare view exposes meaningful regressions across multi
   \end{tabular}
   \caption{Structured comparison of success/failure archive pairs across three case-study tracks. Case A captures a factual-overstatement failure from a real coding-agent run; Cases B and C use deterministic pipelines. All three produce actionable multi-dimensional diffs.}
   \label{tab:case-studies}
-\end{table}
-
-For example, in Case A, the agent was asked to revise a condensed paper excerpt and overstates the completion status of Case A, producing a factual-overstatement failure that the archive comparison surfaces as regressions in verification and evaluation while governance remains unchanged. In Case B, the successful run emits both \texttt{answer} and \texttt{retrieval\_report}, while the failed run emits only \texttt{answer}, triggers a missing-expected-artifact warning, and shifts the evaluation recommendation from \texttt{keep} to \texttt{observe}. In Case C, the failed run loses the expected \texttt{plan\_note}, shifts from success to execution failure, and causes parallel regressions in verification, reassessment, and artifact status.
-
-\subsection{Quantitative proxy evaluation}
-
-To support future controlled evaluation, the system ships with A/B study materials for contrasting raw logs versus archive compare outputs on failure localization tasks---including a moderator script, a post-study questionnaire, and a score-sheet template. In this paper, we present two quantitative proxy evaluations that characterize the archive format's diagnostic value.
-
-\paragraph{Information density analysis.}
-We quantify the proportion of each material that directly supports diagnosis---text that answers ``which stage failed'' and ``what was the root cause''---relative to total character count. Table~\ref{tab:info-density} summarizes the results.
-
-\begin{table}[H]
-  \centering
-  \small
-  \begin{tabular}{lrrrr}
-    \toprule
-    \textbf{Material} & \textbf{Total chars} & \textbf{Diagnostic chars} & \textbf{Info density} & \textbf{Inference steps} \\
-    \midrule
-    S1 raw\_logs         & 1,219 & 221 & 18.1\% & 3 \\
-    S1 archive\_compare  & 1,376 & 540 & 39.2\% & 2 \\
-    S2 raw\_logs         & 1,365 & 485 & 35.5\% & 4 \\
-    S2 archive\_compare  & 1,147 & 534 & 46.6\% & 2 \\
-    \bottomrule
-  \end{tabular}
-  \caption{Information density and inference steps for raw log vs.\ archive compare materials across two scenarios. Archive compare materials achieve higher diagnostic density with comparable or shorter total length.}
-  \label{tab:info-density}
-\end{table}
-
-Archive compare materials show substantially higher information density (+116\% for S1, +31\% for S2) and require fewer inference steps to reach a complete diagnosis (2 steps in both archive conditions versus 3--4 steps in the raw log conditions). The gain comes from reduced noise rather than added verbosity.
-
-\paragraph{LLM-as-evaluator (blind).}
-We run a blind proxy evaluation using two frontier models (DeepSeek-Chat and GLM-5.1) as stand-in evaluators. Each model receives either the raw log or the archive compare output for each scenario without being told which condition it is reading, and is asked to identify the failure stage and root cause. We repeat each condition three times per model ($n{=}6$ per cell after aggregating across models). Table~\ref{tab:llm-eval} shows the results.
-
-\begin{table}[H]
-  \centering
-  \small
-  \begin{tabular}{llrrr}
-    \toprule
-    \textbf{Scenario} & \textbf{Condition} & \textbf{Stage acc.} & \textbf{Cause acc.} & \textbf{Mean conf.} \\
-    \midrule
-    S1 & raw\_logs        & 100\% (6/6) & 100\% (6/6) & 4.5 \\
-    S1 & archive\_compare &   0\% (0/6) & 100\% (6/6) & 4.8 \\
-    S2 & raw\_logs        & 100\% (6/6) & 100\% (6/6) & 4.5 \\
-    S2 & archive\_compare & 100\% (6/6) & 100\% (6/6) & 5.0 \\
-    \bottomrule
-  \end{tabular}
-  \caption{Blind LLM proxy evaluation results (DeepSeek-Chat + GLM-5.1, $n{=}6$ per cell). Cause attribution is 100\% across all conditions. The S1 archive\_compare stage misclassification is discussed in Section~\ref{sec:limitations}.}
-  \label{tab:llm-eval}
-\end{table}
-
-Cause attribution accuracy is 100\% across all conditions and both models. Stage accuracy is 100\% in three of four conditions. The single exception---S1 archive\_compare stage classified as \texttt{execution} rather than \texttt{verification} (0/6)---reflects a semantic ambiguity in the archive schema and is discussed as a finding in Section~\ref{sec:limitations}. Together, the proxy results establish an initial quantitative baseline for the archive format's diagnostic effectiveness.
-
-\section{Limitations and Next Steps}
-\label{sec:limitations}
-
-This work remains an early-stage systems contribution, and several limitations are important.
-
-First, our current empirical evidence is strongest on \textbf{taxonomy alignment}, \textbf{case-study generation}, and \textbf{proxy evaluation}. The proxy evaluation in Section~\ref{sec:eval} provides quantitative support for the archive format's diagnostic clarity. A controlled human user study with larger participant numbers remains future work; the proxy results should therefore be read as an initial quantitative baseline rather than a definitive measure of human debugging benefit.
-
-Second, the LLM proxy evaluation surfaces a \textbf{stage label ambiguity} in the archive schema. For Scenario 1, both frontier models consistently classify the failure stage as \texttt{execution} rather than \texttt{verification} when reading the archive compare output (0/6 correct). The underlying cause is that retrieval strategy degradation is an execution-time behavior, yet the archive schema surfaces it through the verification report. This suggests that stage labels for retrieval-specific failures may benefit from an additional sub-label or disambiguation note in future schema versions. Importantly, root cause identification is unaffected by this ambiguity.
-
-Third, \textbf{Case A} now includes a usable success/failure archive pair, but the current failure sample is intentionally reduced in scope. The success run is a real repository-grounded Aider edit, whereas the failure-prone run is collected from a condensed paper excerpt rather than a full-paper rewrite. This means the current Case A evidence is sufficient for archive-based comparison, but still leaves room to extend the study toward larger-scope coding-agent and writing tasks.
-
-Fourth, the current system is \textbf{CLI-first and single-agent oriented}. While this is a deliberate design choice for local-first debugging, it means the present implementation does not yet fully explore richer multi-agent archive browsing or hosted collaboration features.
-
-Finally, the current AgentRx mapping experiment establishes coverage and interpretability, but not yet downstream benefits such as reduced debugging time or higher root-cause accuracy. Those questions are the natural target for future controlled evaluation with real developer participants.
-
-Future directions include: (1) running a controlled human user study to validate the proxy evaluation results with real developer participants, (2) extending Case A from the current real-success / reduced-scope-failure pair to a broader set of repository-grounded coding-agent and writing samples, and (3) extending the archive adapter from labeled summaries to richer trajectory-level analysis over the raw benchmark files.
-
-\section{Conclusion}
-
-archive-first-harness argues for an Evidence Layer in agent tooling: a local, structured, comparison-oriented layer between observability and debugging. By turning each run into a compact archive and exposing stage-aware diffs, the system makes it easier to answer a practical question that raw traces alone often leave unresolved: \emph{what materially changed between two runs?}
-
-Our current results show that this idea is already concrete enough to support real-data taxonomy mapping, deterministic case-study comparisons, and quantitative proxy evidence for the archive format's diagnostic clarity. We view this as an argument not only for one tool, but for a broader design principle: agent systems need better evidence surfaces, not just more traces.
-
-\bibliographystyle{unsrt}
-\bibliography{references}
+\end{table*}
 
 \end{document}

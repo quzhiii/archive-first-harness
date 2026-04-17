@@ -1,0 +1,30 @@
+{
+  "baseline_compare_results": {
+    "compared_artifact_types": [
+      "answer"
+    ],
+    "status": "completed",
+    "status_counts": {
+      "breaking": 1,
+      "warning": 1
+    }
+  },
+  "evaluation_input_bundle": {
+    "task_contract_summary": {
+      "task_type": "rag",
+      "workflow_profile_id": "paper_case_b_rag"
+    }
+  },
+  "realm_evaluation": {
+    "metadata": {
+      "automatic_action": "none"
+    },
+    "reason_codes": [
+      "ungrounded_answer",
+      "artifact_missing"
+    ],
+    "recommendation": "observe",
+    "requires_human_review": true,
+    "status": "fail"
+  }
+}

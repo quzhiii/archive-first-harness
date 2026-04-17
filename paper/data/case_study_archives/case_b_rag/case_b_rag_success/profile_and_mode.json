@@ -1,0 +1,7 @@
+{
+  "formation_id": "paper",
+  "policy_mode": "paper",
+  "profile_resolution": {},
+  "task_type": "rag",
+  "workflow_profile_id": "paper_case_b_rag"
+}

@@ -1,0 +1,54 @@
+{
+  "execution_result": {
+    "artifacts": [
+      {
+        "path": "paper/experiments/exp2_case_studies/case_a_coding/failure_prone_sample.md",
+        "type": "file_change"
+      }
+    ],
+    "error": null,
+    "metadata": {
+      "changed_files": [
+        "paper/experiments/exp2_case_studies/case_a_coding/failure_prone_sample.md"
+      ],
+      "files_changed_count": 1,
+      "model": "openai/deepseek-chat",
+      "paper_experiment": "exp2_case_a_coding",
+      "repo_scope": "paper/experiments/exp2_case_studies/case_a_coding/failure_prone_sample.md",
+      "run_kind": "failure",
+      "verification_command": "review failure_prone_sample.md and check whether it falsely states that Case A already has a completed success/failure pair"
+    },
+    "output": "Aider rewrote the reduced Case A sample and incorrectly claimed that the repository already contains a completed success/failure capture pair for Case A.",
+    "status": "success",
+    "tool_name": "aider"
+  },
+  "residual_followup": {
+    "auto_execution": "none",
+    "governance": {
+      "requires_governance_override": false,
+      "status": "clear"
+    },
+    "reassessment": {
+      "needs_followup": true,
+      "reason_codes": [
+        "verification_failed",
+        "coding_agent_regressed"
+      ],
+      "reassessed_level": "high"
+    }
+  },
+  "verification_report": {
+    "passed": false,
+    "status": "failed",
+    "warnings": [
+      {
+        "code": "verification_failed",
+        "message": "Post-change verification did not pass."
+      },
+      {
+        "code": "manual_review_needed",
+        "message": "Manual review is required before accepting this run."
+      }
+    ]
+  }
+}

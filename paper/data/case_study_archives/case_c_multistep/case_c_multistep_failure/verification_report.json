@@ -1,0 +1,10 @@
+{
+  "passed": false,
+  "status": "failed",
+  "warnings": [
+    {
+      "code": "missing_expected_artifact",
+      "message": "plan_note was not produced"
+    }
+  ]
+}

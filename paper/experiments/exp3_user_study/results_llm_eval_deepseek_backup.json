@@ -1,0 +1,242 @@
+[
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario1",
+    "material": "scenario1_raw_logs",
+    "condition": "raw_logs",
+    "run": 1,
+    "response": {
+      "stage": "verification",
+      "cause": "The agent produced an answer that was not grounded in retrieved evidence and failed to produce the required retrieval_report artifact.",
+      "confidence": 5,
+      "key_field": "Verification Report"
+    },
+    "scores": {
+      "stage_correct": true,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "Verification Report"
+    },
+    "error": null
+  },
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario1",
+    "material": "scenario1_raw_logs",
+    "condition": "raw_logs",
+    "run": 2,
+    "response": {
+      "stage": "verification",
+      "cause": "The agent's answer was not grounded in retrieved evidence and a required retrieval report artifact was missing.",
+      "confidence": 5,
+      "key_field": "Verification Report"
+    },
+    "scores": {
+      "stage_correct": true,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "Verification Report"
+    },
+    "error": null
+  },
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario1",
+    "material": "scenario1_raw_logs",
+    "condition": "raw_logs",
+    "run": 3,
+    "response": {
+      "stage": "verification",
+      "cause": "The agent's answer was not grounded in retrieved evidence and a required retrieval report artifact was missing.",
+      "confidence": 5,
+      "key_field": "Verification Report"
+    },
+    "scores": {
+      "stage_correct": true,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "Verification Report"
+    },
+    "error": null
+  },
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario1",
+    "material": "scenario1_archive_compare",
+    "condition": "archive_compare",
+    "run": 1,
+    "response": {
+      "stage": "execution",
+      "cause": "The retrieval strategy regressed to a broad, noisy search, causing the agent to produce an ungrounded answer and fail to generate the required retrieval_report artifact.",
+      "confidence": 5,
+      "key_field": "Reason Codes Changed"
+    },
+    "scores": {
+      "stage_correct": false,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "Reason Codes Changed"
+    },
+    "error": null
+  },
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario1",
+    "material": "scenario1_archive_compare",
+    "condition": "archive_compare",
+    "run": 2,
+    "response": {
+      "stage": "execution",
+      "cause": "The retrieval strategy regressed to a broad, noisy search, causing the agent to generate an ungrounded answer based on irrelevant information and fail to produce the required retrieval_report artifact.",
+      "confidence": 5,
+      "key_field": "Reason Codes Changed"
+    },
+    "scores": {
+      "stage_correct": false,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "Reason Codes Changed"
+    },
+    "error": null
+  },
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario1",
+    "material": "scenario1_archive_compare",
+    "condition": "archive_compare",
+    "run": 3,
+    "response": {
+      "stage": "execution",
+      "cause": "The retrieval strategy regressed to a broad, noisy search, leading to ungrounded answers and missing the required retrieval_report artifact.",
+      "confidence": 5,
+      "key_field": "Reason Codes Changed"
+    },
+    "scores": {
+      "stage_correct": false,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "Reason Codes Changed"
+    },
+    "error": null
+  },
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario2",
+    "material": "scenario2_raw_logs",
+    "condition": "raw_logs",
+    "run": 1,
+    "response": {
+      "stage": "execution",
+      "cause": "The restaurant_api tool call failed due to an external service being unavailable, halting the multi-step execution.",
+      "confidence": 5,
+      "key_field": "verification_report"
+    },
+    "scores": {
+      "stage_correct": true,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "verification_report"
+    },
+    "error": null
+  },
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario2",
+    "material": "scenario2_raw_logs",
+    "condition": "raw_logs",
+    "run": 2,
+    "response": {
+      "stage": "execution",
+      "cause": "The restaurant_api tool call failed due to an external service being unavailable, halting the multi-step execution.",
+      "confidence": 5,
+      "key_field": "verification_report"
+    },
+    "scores": {
+      "stage_correct": true,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "verification_report"
+    },
+    "error": null
+  },
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario2",
+    "material": "scenario2_raw_logs",
+    "condition": "raw_logs",
+    "run": 3,
+    "response": {
+      "stage": "execution",
+      "cause": "The restaurant_api tool call failed, likely due to an external service being unavailable, which prevented the multi-step task from completing.",
+      "confidence": 5,
+      "key_field": "verification_report"
+    },
+    "scores": {
+      "stage_correct": true,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "verification_report"
+    },
+    "error": null
+  },
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario2",
+    "material": "scenario2_archive_compare",
+    "condition": "archive_compare",
+    "run": 1,
+    "response": {
+      "stage": "execution",
+      "cause": "Step 2 (restaurant API call) timed out, causing the entire 3-step workflow to abort and no plan_note artifact to be generated.",
+      "confidence": 5,
+      "key_field": "Root Cause in One Line"
+    },
+    "scores": {
+      "stage_correct": true,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "Root Cause in One Line"
+    },
+    "error": null
+  },
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario2",
+    "material": "scenario2_archive_compare",
+    "condition": "archive_compare",
+    "run": 2,
+    "response": {
+      "stage": "execution",
+      "cause": "Step 2 (restaurant API call) timed out, causing the entire 3-step workflow to abort and no plan_note to be generated.",
+      "confidence": 5,
+      "key_field": "Root Cause in One Line"
+    },
+    "scores": {
+      "stage_correct": true,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "Root Cause in One Line"
+    },
+    "error": null
+  },
+  {
+    "model": "deepseek-chat",
+    "scenario": "scenario2",
+    "material": "scenario2_archive_compare",
+    "condition": "archive_compare",
+    "run": 3,
+    "response": {
+      "stage": "execution",
+      "cause": "Step 2 (restaurant API call) timed out, causing the entire 3-step workflow to abort and no plan_note to be generated.",
+      "confidence": 5,
+      "key_field": "Root Cause in One Line"
+    },
+    "scores": {
+      "stage_correct": true,
+      "cause_correct": true,
+      "confidence": 5,
+      "key_field": "Root Cause in One Line"
+    },
+    "error": null
+  }
+]

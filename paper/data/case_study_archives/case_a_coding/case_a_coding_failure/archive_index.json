@@ -1,0 +1,60 @@
+{
+  "archive_dir": "E:\\BaiduSyncdisk\\koni\u7535\u8111\\\u521b\u4e1a\\\u79d1\u7814\u5c0f\u5de5\u5177\\my-agent\\paper\\data\\case_study_archives\\case_a_coding\\case_a_coding_failure",
+  "archive_version": "v1",
+  "file_count": 10,
+  "files": [
+    "manifest.json",
+    "task_contract.json",
+    "profile_and_mode.json",
+    "verification_report.json",
+    "metrics_summary.json",
+    "evaluation_summary.json",
+    "final_output.json",
+    "context_plan.json",
+    "execution_trace.jsonl",
+    "failure_signature.json"
+  ],
+  "run_id": "case_a_coding_failure",
+  "written_files": [
+    {
+      "format": "json",
+      "path": "E:\\BaiduSyncdisk\\koni\u7535\u8111\\\u521b\u4e1a\\\u79d1\u7814\u5c0f\u5de5\u5177\\my-agent\\paper\\data\\case_study_archives\\case_a_coding\\case_a_coding_failure\\manifest.json"
+    },
+    {
+      "format": "json",
+      "path": "E:\\BaiduSyncdisk\\koni\u7535\u8111\\\u521b\u4e1a\\\u79d1\u7814\u5c0f\u5de5\u5177\\my-agent\\paper\\data\\case_study_archives\\case_a_coding\\case_a_coding_failure\\task_contract.json"
+    },
+    {
+      "format": "json",
+      "path": "E:\\BaiduSyncdisk\\koni\u7535\u8111\\\u521b\u4e1a\\\u79d1\u7814\u5c0f\u5de5\u5177\\my-agent\\paper\\data\\case_study_archives\\case_a_coding\\case_a_coding_failure\\profile_and_mode.json"
+    },
+    {
+      "format": "json",
+      "path": "E:\\BaiduSyncdisk\\koni\u7535\u8111\\\u521b\u4e1a\\\u79d1\u7814\u5c0f\u5de5\u5177\\my-agent\\paper\\data\\case_study_archives\\case_a_coding\\case_a_coding_failure\\verification_report.json"
+    },
+    {
+      "format": "json",
+      "path": "E:\\BaiduSyncdisk\\koni\u7535\u8111\\\u521b\u4e1a\\\u79d1\u7814\u5c0f\u5de5\u5177\\my-agent\\paper\\data\\case_study_archives\\case_a_coding\\case_a_coding_failure\\metrics_summary.json"
+    },
+    {
+      "format": "json",
+      "path": "E:\\BaiduSyncdisk\\koni\u7535\u8111\\\u521b\u4e1a\\\u79d1\u7814\u5c0f\u5de5\u5177\\my-agent\\paper\\data\\case_study_archives\\case_a_coding\\case_a_coding_failure\\evaluation_summary.json"
+    },
+    {
+      "format": "json",
+      "path": "E:\\BaiduSyncdisk\\koni\u7535\u8111\\\u521b\u4e1a\\\u79d1\u7814\u5c0f\u5de5\u5177\\my-agent\\paper\\data\\case_study_archives\\case_a_coding\\case_a_coding_failure\\final_output.json"
+    },
+    {
+      "format": "json",
+      "path": "E:\\BaiduSyncdisk\\koni\u7535\u8111\\\u521b\u4e1a\\\u79d1\u7814\u5c0f\u5de5\u5177\\my-agent\\paper\\data\\case_study_archives\\case_a_coding\\case_a_coding_failure\\context_plan.json"
+    },
+    {
+      "format": "jsonl",
+      "path": "E:\\BaiduSyncdisk\\koni\u7535\u8111\\\u521b\u4e1a\\\u79d1\u7814\u5c0f\u5de5\u5177\\my-agent\\paper\\data\\case_study_archives\\case_a_coding\\case_a_coding_failure\\execution_trace.jsonl"
+    },
+    {
+      "format": "json",
+      "path": "E:\\BaiduSyncdisk\\koni\u7535\u8111\\\u521b\u4e1a\\\u79d1\u7814\u5c0f\u5de5\u5177\\my-agent\\paper\\data\\case_study_archives\\case_a_coding\\case_a_coding_failure\\failure_signature.json"
+    }
+  ]
+}

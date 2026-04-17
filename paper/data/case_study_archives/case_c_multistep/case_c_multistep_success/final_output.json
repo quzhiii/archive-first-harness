@@ -1,0 +1,39 @@
+{
+  "execution_result": {
+    "artifacts": [
+      {
+        "path": "case_c/plan_note.md",
+        "type": "plan_note"
+      }
+    ],
+    "metadata": {
+      "steps_completed": [
+        "weather",
+        "restaurant",
+        "note"
+      ]
+    },
+    "output": "Weather checked, restaurant selected, final note generated.",
+    "status": "success",
+    "tool_name": "paper_multistep_agent"
+  },
+  "residual_followup": {
+    "auto_execution": "none",
+    "governance": {
+      "requires_governance_override": false,
+      "status": "clear"
+    },
+    "reassessment": {
+      "needs_followup": false,
+      "reason_codes": [
+        "workflow_complete"
+      ],
+      "reassessed_level": "low"
+    }
+  },
+  "verification_report": {
+    "passed": true,
+    "status": "passed",
+    "warnings": []
+  }
+}

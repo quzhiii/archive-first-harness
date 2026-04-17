@@ -1,0 +1,14 @@
+{
+  "contract_id": "case-a-success-contract",
+  "expected_artifacts": [
+    "file_change"
+  ],
+  "goal": "Use Aider to update the Case A README by adding a concrete JSON example that shows how to fill template_success.json after a real run.",
+  "success_criteria": [
+    "Edit only the Case A README.",
+    "Add a realistic JSON example after the archive-writing section."
+  ],
+  "task_id": "case-a-success",
+  "task_type": "coding",
+  "workflow_profile_id": "paper_case_a_coding"
+}

@@ -1,0 +1,14 @@
+{
+  "passed": false,
+  "status": "failed",
+  "warnings": [
+    {
+      "code": "verification_failed",
+      "message": "Post-change verification did not pass."
+    },
+    {
+      "code": "manual_review_needed",
+      "message": "Manual review is required before accepting this run."
+    }
+  ]
+}

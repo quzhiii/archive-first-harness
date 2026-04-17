@@ -1,0 +1,46 @@
+{
+  "execution_result": {
+    "artifacts": [
+      {
+        "path": "case_b/failure_answer.md",
+        "type": "answer"
+      }
+    ],
+    "metadata": {
+      "retrieval_strategy": "broad_noisy",
+      "top_k": 12
+    },
+    "output": "This tool is mainly an observability dashboard SaaS.",
+    "status": "success",
+    "tool_name": "paper_rag_agent"
+  },
+  "residual_followup": {
+    "auto_execution": "none",
+    "governance": {
+      "requires_governance_override": false,
+      "status": "clear"
+    },
+    "reassessment": {
+      "needs_followup": true,
+      "reason_codes": [
+        "grounding_failed",
+        "retrieval_strategy_regressed"
+      ],
+      "reassessed_level": "high"
+    }
+  },
+  "verification_report": {
+    "passed": false,
+    "status": "failed",
+    "warnings": [
+      {
+        "code": "missing_expected_artifact",
+        "message": "retrieval_report missing"
+      },
+      {
+        "code": "grounding_failed",
+        "message": "answer not grounded in retrieved evidence"
+      }
+    ]
+  }
+}

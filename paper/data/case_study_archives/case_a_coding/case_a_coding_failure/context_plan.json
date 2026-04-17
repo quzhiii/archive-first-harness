@@ -1,0 +1,11 @@
+{
+  "block_selection_report": {},
+  "context_bias": {
+    "block_order": [],
+    "included_blocks": []
+  },
+  "formation_id": "paper",
+  "policy_mode": "paper",
+  "workflow_profile_id": "paper_case_a_coding",
+  "working_context_summary": {}
+}

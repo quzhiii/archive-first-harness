@@ -1,0 +1,7 @@
+{
+  "error_type": "verification_failed",
+  "failed_stage": "verification",
+  "failure_class": "verification_failed",
+  "message_excerpt": "failed",
+  "status": "failed"
+}

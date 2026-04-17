@@ -1,0 +1,7 @@
+{
+  "error_type": "restaurant_api_timeout",
+  "failed_stage": "execution",
+  "failure_class": "restaurant_api_timeout",
+  "message_excerpt": "Step 2 failed while choosing restaurant.",
+  "status": "failed"
+}

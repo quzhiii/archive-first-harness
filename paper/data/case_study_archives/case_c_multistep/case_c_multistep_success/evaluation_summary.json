@@ -1,0 +1,28 @@
+{
+  "baseline_compare_results": {
+    "compared_artifact_types": [
+      "plan_note"
+    ],
+    "status": "completed",
+    "status_counts": {
+      "compatible": 1
+    }
+  },
+  "evaluation_input_bundle": {
+    "task_contract_summary": {
+      "task_type": "execution",
+      "workflow_profile_id": "paper_case_c_multistep"
+    }
+  },
+  "realm_evaluation": {
+    "metadata": {
+      "automatic_action": "none"
+    },
+    "reason_codes": [
+      "all_steps_completed"
+    ],
+    "recommendation": "keep",
+    "requires_human_review": false,
+    "status": "pass"
+  }
+}

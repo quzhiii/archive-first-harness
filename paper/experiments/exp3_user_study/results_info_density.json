@@ -1,0 +1,161 @@
+[
+  {
+    "name": "scenario1_raw_logs",
+    "total_chars": 1219,
+    "key_chars": 221,
+    "density": 0.1813,
+    "density_pct": "18.1%",
+    "path_length": 3,
+    "blocks_needed": [
+      "Agent Output",
+      "Verification Report",
+      "Reassessment"
+    ],
+    "path_note": "需从 metadata.retrieval_strategy → verification warnings → reassessment reason_codes 综合推断",
+    "span_details": [
+      {
+        "description": "检索策略退化信号",
+        "pattern": "retrieval_strategy.*broad_noisy",
+        "match_count": 1,
+        "chars": 41
+      },
+      {
+        "description": "grounding失败码",
+        "pattern": "grounding_failed",
+        "match_count": 2,
+        "chars": 161
+      },
+      {
+        "description": "策略退化reason code",
+        "pattern": "retrieval_strategy_regressed",
+        "match_count": 1,
+        "chars": 0
+      },
+      {
+        "description": "verification失败",
+        "pattern": "\"passed\":\\s*false",
+        "match_count": 1,
+        "chars": 19
+      }
+    ]
+  },
+  {
+    "name": "scenario1_archive_compare",
+    "total_chars": 1376,
+    "key_chars": 540,
+    "density": 0.3924,
+    "density_pct": "39.2%",
+    "path_length": 2,
+    "blocks_needed": [
+      "Key Transitions",
+      "Reason Codes Changed"
+    ],
+    "path_note": "Key Transitions 直接标注 verification regressed，Reason Codes 给出 retrieval_strategy_regressed",
+    "span_details": [
+      {
+        "description": "策略退化transition",
+        "pattern": "retrieval_strategy_regressed",
+        "match_count": 1,
+        "chars": 44
+      },
+      {
+        "description": "grounding失败码",
+        "pattern": "grounding_failed",
+        "match_count": 1,
+        "chars": 49
+      },
+      {
+        "description": "verification退化标记",
+        "pattern": "verification:.*passed.*failed",
+        "match_count": 1,
+        "chars": 412
+      },
+      {
+        "description": "幻觉输出标注",
+        "pattern": "SaaS dashboard",
+        "match_count": 1,
+        "chars": 35
+      }
+    ]
+  },
+  {
+    "name": "scenario2_raw_logs",
+    "total_chars": 1365,
+    "key_chars": 485,
+    "density": 0.3553,
+    "density_pct": "35.5%",
+    "path_length": 4,
+    "blocks_needed": [
+      "Execution Trace",
+      "Verification Report",
+      "Reassessment",
+      "Failure Signature"
+    ],
+    "path_note": "需从时间戳推断 step2 卡住，failure_signature 不暴露具体步骤，需综合4个块",
+    "span_details": [
+      {
+        "description": "step2启动无响应（时间戳推断）",
+        "pattern": "step_started.*step=2[\\s\\S]{0,200}runtime_completed",
+        "match_count": 1,
+        "chars": 249
+      },
+      {
+        "description": "tool_unavailable warning",
+        "pattern": "tool_unavailable",
+        "match_count": 2,
+        "chars": 141
+      },
+      {
+        "description": "partial_output warning",
+        "pattern": "partial_output",
+        "match_count": 1,
+        "chars": 95
+      },
+      {
+        "description": "execution_failed reason",
+        "pattern": "execution_failed",
+        "match_count": 1,
+        "chars": 0
+      }
+    ]
+  },
+  {
+    "name": "scenario2_archive_compare",
+    "total_chars": 1147,
+    "key_chars": 534,
+    "density": 0.4656,
+    "density_pct": "46.6%",
+    "path_length": 2,
+    "blocks_needed": [
+      "Key Transitions",
+      "Reason Codes Changed"
+    ],
+    "path_note": "Key Transitions 直接给出 restaurant_api_timeout，Root Cause in One Line 直接说明",
+    "span_details": [
+      {
+        "description": "failure transition",
+        "pattern": "failure:.*none.*restaurant_api_timeout",
+        "match_count": 1,
+        "chars": 60
+      },
+      {
+        "description": "step2_timeout码",
+        "pattern": "step2_timeout",
+        "match_count": 2,
+        "chars": 104
+      },
+      {
+        "description": "artifacts全部丢失",
+        "pattern": "artifacts:.*compatible.*none",
+        "match_count": 1,
+        "chars": 61
+      },
+      {
+        "description": "verification退化标记",
+        "pattern": "verification:.*passed.*failed",
+        "match_count": 1,
+        "chars": 309
+      }
+    ]
+  }
+]

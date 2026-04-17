@@ -1,0 +1,5 @@
+{
+  "duration_ms": 116700,
+  "files_changed_count": 1,
+  "verification_command": "review failure_prone_sample.md and check whether it falsely states that Case A already has a completed success/failure pair"
+}

@@ -1,0 +1,44 @@
+{
+  "execution_result": {
+    "artifacts": [
+      {
+        "path": "paper/experiments/exp2_case_studies/case_a_coding/README.md",
+        "type": "file_change"
+      }
+    ],
+    "error": null,
+    "metadata": {
+      "changed_files": [
+        "paper/experiments/exp2_case_studies/case_a_coding/README.md"
+      ],
+      "files_changed_count": 1,
+      "model": "openai/gpt-5.4-mini",
+      "paper_experiment": "exp2_case_a_coding",
+      "repo_scope": "paper/experiments/exp2_case_studies/case_a_coding/README.md",
+      "run_kind": "success",
+      "verification_command": "git diff -- paper/experiments/exp2_case_studies/case_a_coding/README.md"
+    },
+    "output": "Aider updated the README and added a new section with a concrete JSON example for a real success record.",
+    "status": "success",
+    "tool_name": "aider"
+  },
+  "residual_followup": {
+    "auto_execution": "none",
+    "governance": {
+      "requires_governance_override": false,
+      "status": "clear"
+    },
+    "reassessment": {
+      "needs_followup": false,
+      "reason_codes": [
+        "verified_fix"
+      ],
+      "reassessed_level": "low"
+    }
+  },
+  "verification_report": {
+    "passed": true,
+    "status": "passed",
+    "warnings": []
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "contract_id": "case-c-failure-contract",
+  "expected_artifacts": [
+    "plan_note"
+  ],
+  "goal": "Collect weather, choose lunch venue, and produce a final note.",
+  "success_criteria": [
+    "All three steps complete and final note is produced."
+  ],
+  "task_id": "case-c-failure",
+  "task_type": "execution",
+  "workflow_profile_id": "paper_case_c_multistep"
+}

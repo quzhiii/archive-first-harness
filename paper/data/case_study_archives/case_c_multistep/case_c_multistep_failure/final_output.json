@@ -1,0 +1,43 @@
+{
+  "execution_result": {
+    "artifacts": [],
+    "error": {
+      "message": "Step 2 failed while choosing restaurant.",
+      "type": "restaurant_api_timeout"
+    },
+    "metadata": {
+      "failed_step": "restaurant",
+      "steps_completed": [
+        "weather"
+      ]
+    },
+    "output": null,
+    "status": "error",
+    "tool_name": "paper_multistep_agent"
+  },
+  "residual_followup": {
+    "auto_execution": "none",
+    "governance": {
+      "requires_governance_override": false,
+      "status": "clear"
+    },
+    "reassessment": {
+      "needs_followup": true,
+      "reason_codes": [
+        "execution_failed",
+        "step2_timeout"
+      ],
+      "reassessed_level": "high"
+    }
+  },
+  "verification_report": {
+    "passed": false,
+    "status": "failed",
+    "warnings": [
+      {
+        "code": "missing_expected_artifact",
+        "message": "plan_note was not produced"
+      }
+    ]
+  }
+}

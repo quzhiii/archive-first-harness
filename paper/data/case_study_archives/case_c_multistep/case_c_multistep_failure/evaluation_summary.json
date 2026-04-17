@@ -1,0 +1,25 @@
+{
+  "baseline_compare_results": {
+    "compared_artifact_types": [],
+    "status": "not_requested",
+    "status_counts": {}
+  },
+  "evaluation_input_bundle": {
+    "task_contract_summary": {
+      "task_type": "execution",
+      "workflow_profile_id": "paper_case_c_multistep"
+    }
+  },
+  "realm_evaluation": {
+    "metadata": {
+      "automatic_action": "none"
+    },
+    "reason_codes": [
+      "step2_timeout",
+      "artifact_missing"
+    ],
+    "recommendation": "observe",
+    "requires_human_review": true,
+    "status": "fail"
+  }
+}

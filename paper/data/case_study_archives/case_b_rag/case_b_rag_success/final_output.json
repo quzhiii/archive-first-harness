@@ -1,0 +1,40 @@
+{
+  "execution_result": {
+    "artifacts": [
+      {
+        "path": "case_b/success_answer.md",
+        "type": "answer"
+      },
+      {
+        "path": "case_b/success_retrieval.json",
+        "type": "retrieval_report"
+      }
+    ],
+    "metadata": {
+      "retrieval_strategy": "targeted",
+      "top_k": 3
+    },
+    "output": "Archive-first-harness is positioned as an Evidence Layer in the AI agent stack.",
+    "status": "success",
+    "tool_name": "paper_rag_agent"
+  },
+  "residual_followup": {
+    "auto_execution": "none",
+    "governance": {
+      "requires_governance_override": false,
+      "status": "clear"
+    },
+    "reassessment": {
+      "needs_followup": false,
+      "reason_codes": [
+        "grounding_confirmed"
+      ],
+      "reassessed_level": "low"
+    }
+  },
+  "verification_report": {
+    "passed": true,
+    "status": "passed",
+    "warnings": []
+  }
+}

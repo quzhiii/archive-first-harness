@@ -1,0 +1,7 @@
+{
+  "formation_id": "paper",
+  "policy_mode": "paper",
+  "profile_resolution": {},
+  "task_type": "execution",
+  "workflow_profile_id": "paper_case_c_multistep"
+}

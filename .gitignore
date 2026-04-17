@@ -16,3 +16,21 @@ __pycache__/
 /pip-install-*/
 /pip-unpack-*/
 /pytest-cache-files-*/
+
+# Aider / Codex tool caches
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/
+.codex-backups/
+
+# Personal notes (not for repo)
+AI架构_AI_Agent执行Prompt_v2.md
+AI架构_完整优化方案_v2.md
+
+# LaTeX build artifacts
+paper/writing/*.aux
+paper/writing/*.bbl
+paper/writing/*.blg
+paper/writing/*.log
+paper/writing/*.out
+paper/writing/*.pdf

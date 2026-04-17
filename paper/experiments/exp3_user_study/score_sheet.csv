@@ -1,0 +1,7 @@
+participant_id,scenario,condition_order,raw_logs_duration_sec,raw_logs_stage_correct,raw_logs_cause_correct,raw_logs_usefulness,compare_duration_sec,compare_stage_correct,compare_cause_correct,compare_usefulness,preferred_method,notes
+P1,scenario1,A_first,,,,,,,,
+P1,scenario2,A_first,,,,,,,,
+P2,scenario1,B_first,,,,,,,,
+P2,scenario2,B_first,,,,,,,,
+P3,scenario1,A_first,,,,,,,,
+P3,scenario2,B_first,,,,,,,,

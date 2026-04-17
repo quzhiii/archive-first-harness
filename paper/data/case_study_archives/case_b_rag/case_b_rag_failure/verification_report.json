@@ -1,0 +1,14 @@
+{
+  "passed": false,
+  "status": "failed",
+  "warnings": [
+    {
+      "code": "missing_expected_artifact",
+      "message": "retrieval_report missing"
+    },
+    {
+      "code": "grounding_failed",
+      "message": "answer not grounded in retrieved evidence"
+    }
+  ]
+}

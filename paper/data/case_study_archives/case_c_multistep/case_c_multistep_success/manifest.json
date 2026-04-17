@@ -1,0 +1,16 @@
+{
+  "archive_version": "v1",
+  "created_at": "2026-04-13T13:00:00Z",
+  "formation_id": "paper",
+  "history_entry_written": false,
+  "policy_mode": "paper",
+  "run_id": "case_c_multistep_success",
+  "status": "success",
+  "task_summary": {
+    "contract_id": "case-c-success-contract",
+    "task": "Plan a lunch outing based on weather.",
+    "task_id": "case-c-success",
+    "task_type": "execution"
+  },
+  "workflow_profile_id": "paper_case_c_multistep"
+}

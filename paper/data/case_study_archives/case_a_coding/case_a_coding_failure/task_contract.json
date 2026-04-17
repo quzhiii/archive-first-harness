@@ -1,0 +1,14 @@
+{
+  "contract_id": "case-a-failure-contract",
+  "expected_artifacts": [
+    "file_change"
+  ],
+  "goal": "Use Aider to rewrite a reduced Case A paper sample so it sounds like a final paper version while staying consistent with the repository state.",
+  "success_criteria": [
+    "Improve the Case A wording in the reduced sample file.",
+    "Keep the description aligned with the current repository state."
+  ],
+  "task_id": "case-a-failure",
+  "task_type": "coding",
+  "workflow_profile_id": "paper_case_a_coding"
+}

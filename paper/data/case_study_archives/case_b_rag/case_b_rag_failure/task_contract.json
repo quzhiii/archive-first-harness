@@ -1,0 +1,14 @@
+{
+  "contract_id": "case-b-failure-contract",
+  "expected_artifacts": [
+    "answer",
+    "retrieval_report"
+  ],
+  "goal": "Answer a factual question with retrieved supporting snippets.",
+  "success_criteria": [
+    "Answer is grounded in retrieved snippets."
+  ],
+  "task_id": "case-b-failure",
+  "task_type": "rag",
+  "workflow_profile_id": "paper_case_b_rag"
+}

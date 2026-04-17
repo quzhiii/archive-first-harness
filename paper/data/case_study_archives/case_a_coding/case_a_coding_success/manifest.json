@@ -1,0 +1,16 @@
+{
+  "archive_version": "v1",
+  "created_at": "2026-04-13T09:32:31.509755Z",
+  "formation_id": "paper",
+  "history_entry_written": false,
+  "policy_mode": "paper",
+  "run_id": "case_a_coding_success",
+  "status": "success",
+  "task_summary": {
+    "contract_id": "case-a-success-contract",
+    "task": "Use Aider to update the Case A README by adding a concrete JSON example that shows how to fill template_success.json after a real run.",
+    "task_id": "case-a-success",
+    "task_type": "coding"
+  },
+  "workflow_profile_id": "paper_case_a_coding"
+}

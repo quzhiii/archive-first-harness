@@ -1,0 +1,40 @@
+{
+  "total_rows": 4,
+  "category_counts": {
+    "Guardrails Triggered": 1,
+    "Instruction/Plan Adherence Failure": 1,
+    "Invalid Invocation": 1,
+    "Invention of New Information": 1
+  },
+  "stage_counts": {
+    "execution": 2,
+    "governance": 1,
+    "routing": 1
+  },
+  "mapping_counts": {
+    "Guardrails Triggered": {
+      "governance": 1
+    },
+    "Instruction/Plan Adherence Failure": {
+      "routing": 1
+    },
+    "Invalid Invocation": {
+      "execution": 1
+    },
+    "Invention of New Information": {
+      "execution": 1
+    }
+  },
+  "taxonomy_map": {
+    "Instruction/Plan Adherence Failure": "routing",
+    "Intent-Plan Misalignment": "routing",
+    "Underspecified User Intent": "routing",
+    "Intent Not Supported": "routing",
+    "Invalid Invocation": "execution",
+    "Misinterpretation of Tool Output": "execution",
+    "Invention of New Information": "execution",
+    "System Failure": "execution",
+    "Guardrails Triggered": "governance",
+    "Inconclusive": "unknown"
+  }
+}

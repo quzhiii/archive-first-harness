@@ -1,0 +1,27 @@
+{
+  "baseline_compare_results": {
+    "compared_artifact_types": [
+      "file_change"
+    ],
+    "status": "not_requested",
+    "status_counts": {}
+  },
+  "evaluation_input_bundle": {
+    "task_contract_summary": {
+      "task_type": "coding",
+      "workflow_profile_id": "paper_case_a_coding"
+    }
+  },
+  "realm_evaluation": {
+    "metadata": {
+      "automatic_action": "none",
+      "paper_experiment": true
+    },
+    "reason_codes": [
+      "verified_fix"
+    ],
+    "recommendation": "keep",
+    "requires_human_review": false,
+    "status": "pass"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "run_kind": "success",
+  "run_id": "case_a_coding_success",
+  "created_at": "2026-04-13T17:32:31.5097556+08:00",
+  "task": "Use Aider to update the Case A README by adding a concrete JSON example that shows how to fill template_success.json after a real run.",
+  "task_id": "case-a-success",
+  "contract_id": "case-a-success-contract",
+  "tool_name": "aider",
+  "model": "openai/gpt-5.4-mini",
+  "repo_scope": "paper/experiments/exp2_case_studies/case_a_coding/README.md",
+  "execution_status": "success",
+  "output_summary": "Aider updated the README and added a new section with a concrete JSON example for a real success record.",
+  "error_type": "",
+  "error_message": "",
+  "verification_passed": true,
+  "verification_command": "git diff -- paper/experiments/exp2_case_studies/case_a_coding/README.md",
+  "duration_ms": 106400,
+  "changed_files": [
+    "paper/experiments/exp2_case_studies/case_a_coding/README.md"
+  ],
+  "expected_artifacts": [
+    "file_change"
+  ],
+  "produced_artifacts": [
+    {
+      "type": "file_change",
+      "path": "paper/experiments/exp2_case_studies/case_a_coding/README.md"
+    }
+  ],
+  "success_criteria": [
+    "Edit only the Case A README.",
+    "Add a realistic JSON example after the archive-writing section."
+  ],
+  "warning_codes": [],
+  "evaluation_status": "pass",
+  "evaluation_recommendation": "keep",
+  "requires_human_review": false,
+  "evaluation_reason_codes": [
+    "verified_fix"
+  ],
+  "reassessed_level": "low",
+  "reassessment_reason_codes": [
+    "verified_fix"
+  ],
+  "governance_status": "clear",
+  "requires_governance_override": false,
+  "baseline_compare_status": "not_requested",
+  "baseline_status_counts": {},
+  "trace_events": [
+    {
+      "event_type": "coding_agent_run_captured",
+      "status": "success",
+      "metadata": {
+        "tool_name": "aider",
+        "run_kind": "success",
+        "notes": "Aider added the requested JSON example section without editing Python files."
+      }
+    }
+  ]
+}

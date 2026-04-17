@@ -5,6 +5,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from entrypoints._utils import (
+    extract_mapping,
+    normalize_optional_string,
+    normalize_string_list,
+    normalize_string_list_sorted,
+)
 
 RISK_LEVEL_ORDER = {
     "low": 0,
@@ -43,11 +49,11 @@ def browse_run_archives(
         "entry_count": len(selected_entries),
         "limit": int(limit),
         "filters": {
-            "workflow_profile_id": _normalize_optional_string(workflow_profile_id),
-            "task_type": _normalize_optional_string(task_type),
-            "formation_id": _normalize_optional_string(formation_id),
-            "status": _normalize_optional_string(status),
-            "failure_class": _normalize_optional_string(failure_class),
+            "workflow_profile_id": normalize_optional_string(workflow_profile_id),
+            "task_type": normalize_optional_string(task_type),
+            "formation_id": normalize_optional_string(formation_id),
+            "status": normalize_optional_string(status),
+            "failure_class": normalize_optional_string(failure_class),
         },
         "entries": selected_entries,
         "source": source,
@@ -78,11 +84,11 @@ def summarize_run_archives(
         "index_file": str(archive_root_path / "index.jsonl"),
         "entry_count": len(filtered_entries),
         "filters": {
-            "workflow_profile_id": _normalize_optional_string(workflow_profile_id),
-            "task_type": _normalize_optional_string(task_type),
-            "formation_id": _normalize_optional_string(formation_id),
-            "status": _normalize_optional_string(status),
-            "failure_class": _normalize_optional_string(failure_class),
+            "workflow_profile_id": normalize_optional_string(workflow_profile_id),
+            "task_type": normalize_optional_string(task_type),
+            "formation_id": normalize_optional_string(formation_id),
+            "status": normalize_optional_string(status),
+            "failure_class": normalize_optional_string(failure_class),
         },
         "oldest": filtered_entries[0] if filtered_entries else None,
         "latest": filtered_entries[-1] if filtered_entries else None,
@@ -137,7 +143,7 @@ def find_run_archive(
     archive_root: str | Path,
     run_id: str,
 ) -> dict[str, Any]:
-    run_id_text = _normalize_optional_string(run_id)
+    run_id_text = normalize_optional_string(run_id)
     if not run_id_text:
         raise ValueError("run_id must not be empty")
 
@@ -163,48 +169,42 @@ def compare_run_archives(
     left_payload = find_run_archive(archive_root, left_run_id)
     right_payload = find_run_archive(archive_root, right_run_id)
 
-    left_manifest = _extract_mapping(left_payload["archive"], "manifest")
-    right_manifest = _extract_mapping(right_payload["archive"], "manifest")
-    left_task_contract = _extract_mapping(left_payload["archive"], "task_contract")
-    right_task_contract = _extract_mapping(right_payload["archive"], "task_contract")
-    left_failure = _extract_mapping(left_payload["archive"], "failure_signature")
-    right_failure = _extract_mapping(right_payload["archive"], "failure_signature")
-    left_verification = _extract_mapping(left_payload["archive"], "verification_report")
-    right_verification = _extract_mapping(
+    left_manifest = extract_mapping(left_payload["archive"], "manifest")
+    right_manifest = extract_mapping(right_payload["archive"], "manifest")
+    left_task_contract = extract_mapping(left_payload["archive"], "task_contract")
+    right_task_contract = extract_mapping(right_payload["archive"], "task_contract")
+    left_failure = extract_mapping(left_payload["archive"], "failure_signature")
+    right_failure = extract_mapping(right_payload["archive"], "failure_signature")
+    left_verification = extract_mapping(left_payload["archive"], "verification_report")
+    right_verification = extract_mapping(
         right_payload["archive"], "verification_report"
     )
-    left_execution_result = _extract_mapping(
-        left_payload["archive"], "execution_result"
-    )
-    right_execution_result = _extract_mapping(
+    left_execution_result = extract_mapping(left_payload["archive"], "execution_result")
+    right_execution_result = extract_mapping(
         right_payload["archive"], "execution_result"
     )
-    left_profile_and_mode = _extract_mapping(
-        left_payload["archive"], "profile_and_mode"
-    )
-    right_profile_and_mode = _extract_mapping(
+    left_profile_and_mode = extract_mapping(left_payload["archive"], "profile_and_mode")
+    right_profile_and_mode = extract_mapping(
         right_payload["archive"], "profile_and_mode"
     )
-    left_residual_followup = _extract_mapping(
+    left_residual_followup = extract_mapping(
         left_payload["archive"], "residual_followup"
     )
-    right_residual_followup = _extract_mapping(
+    right_residual_followup = extract_mapping(
         right_payload["archive"], "residual_followup"
     )
-    left_reassessment = _extract_mapping(left_residual_followup, "reassessment")
-    right_reassessment = _extract_mapping(right_residual_followup, "reassessment")
-    left_governance = _extract_mapping(left_residual_followup, "governance")
-    right_governance = _extract_mapping(right_residual_followup, "governance")
-    left_evaluation_summary = _extract_mapping(
+    left_reassessment = extract_mapping(left_residual_followup, "reassessment")
+    right_reassessment = extract_mapping(right_residual_followup, "reassessment")
+    left_governance = extract_mapping(left_residual_followup, "governance")
+    right_governance = extract_mapping(right_residual_followup, "governance")
+    left_evaluation_summary = extract_mapping(
         left_payload["archive"], "evaluation_summary"
     )
-    right_evaluation_summary = _extract_mapping(
+    right_evaluation_summary = extract_mapping(
         right_payload["archive"], "evaluation_summary"
     )
-    left_realm_evaluation = _extract_mapping(
-        left_evaluation_summary, "realm_evaluation"
-    )
-    right_realm_evaluation = _extract_mapping(
+    left_realm_evaluation = extract_mapping(left_evaluation_summary, "realm_evaluation")
+    right_realm_evaluation = extract_mapping(
         right_evaluation_summary, "realm_evaluation"
     )
     left_baseline_compare_results = _extract_optional_mapping(
@@ -225,65 +225,65 @@ def compare_run_archives(
         verification_report=right_verification,
         baseline_compare_results=right_baseline_compare_results,
     )
-    left_reassessment_reason_codes = _normalize_string_list(
+    left_reassessment_reason_codes = normalize_string_list(
         left_reassessment.get("reason_codes")
     )
-    right_reassessment_reason_codes = _normalize_string_list(
+    right_reassessment_reason_codes = normalize_string_list(
         right_reassessment.get("reason_codes")
     )
-    left_evaluation_reason_codes = _normalize_string_list(
+    left_evaluation_reason_codes = normalize_string_list(
         left_realm_evaluation.get("reason_codes")
     )
-    right_evaluation_reason_codes = _normalize_string_list(
+    right_evaluation_reason_codes = normalize_string_list(
         right_realm_evaluation.get("reason_codes")
     )
 
     return {
         "archive_root": str(Path(archive_root)),
         "left": {
-            "run_id": _normalize_optional_string(left_payload["entry"].get("run_id"))
+            "run_id": normalize_optional_string(left_payload["entry"].get("run_id"))
             or "",
-            "created_at": _normalize_optional_string(
+            "created_at": normalize_optional_string(
                 left_payload["entry"].get("created_at")
             )
             or "",
-            "status": _normalize_optional_string(left_manifest.get("status")) or "",
-            "workflow_profile_id": _normalize_optional_string(
+            "status": normalize_optional_string(left_manifest.get("status")) or "",
+            "workflow_profile_id": normalize_optional_string(
                 left_manifest.get("workflow_profile_id")
             )
             or "",
-            "task_type": _normalize_optional_string(
-                _extract_mapping(left_manifest, "task_summary").get("task_type")
+            "task_type": normalize_optional_string(
+                extract_mapping(left_manifest, "task_summary").get("task_type")
             )
-            or _normalize_optional_string(left_profile_and_mode.get("task_type"))
+            or normalize_optional_string(left_profile_and_mode.get("task_type"))
             or "",
-            "formation_id": _normalize_optional_string(
+            "formation_id": normalize_optional_string(
                 left_profile_and_mode.get("formation_id")
             )
             or "",
             **left_artifact_summary,
-            "failure_class": _normalize_optional_string(
+            "failure_class": normalize_optional_string(
                 left_failure.get("failure_class")
             )
             or "",
-            "failed_stage": _normalize_optional_string(left_failure.get("failed_stage"))
+            "failed_stage": normalize_optional_string(left_failure.get("failed_stage"))
             or "",
-            "verification_status": _normalize_optional_string(
+            "verification_status": normalize_optional_string(
                 left_verification.get("status")
             )
             or "",
             "verification_passed": bool(left_verification.get("passed")),
-            "reassessed_level": _normalize_optional_string(
+            "reassessed_level": normalize_optional_string(
                 left_reassessment.get("reassessed_level")
             )
             or "",
             "followup_needed": bool(left_reassessment.get("needs_followup")),
             "reassessment_reason_codes": left_reassessment_reason_codes,
-            "evaluation_status": _normalize_optional_string(
+            "evaluation_status": normalize_optional_string(
                 left_realm_evaluation.get("status")
             )
             or "",
-            "evaluation_recommendation": _normalize_optional_string(
+            "evaluation_recommendation": normalize_optional_string(
                 left_realm_evaluation.get("recommendation")
             )
             or "",
@@ -291,64 +291,62 @@ def compare_run_archives(
                 left_realm_evaluation.get("requires_human_review")
             ),
             "evaluation_reason_codes": left_evaluation_reason_codes,
-            "governance_status": _normalize_optional_string(
+            "governance_status": normalize_optional_string(
                 left_governance.get("status")
             )
             or "",
             "governance_required": bool(
                 left_governance.get("requires_governance_override")
             ),
-            "task": _normalize_optional_string(
-                _extract_mapping(left_manifest, "task_summary").get("task")
+            "task": normalize_optional_string(
+                extract_mapping(left_manifest, "task_summary").get("task")
             )
             or "",
         },
         "right": {
-            "run_id": _normalize_optional_string(right_payload["entry"].get("run_id"))
+            "run_id": normalize_optional_string(right_payload["entry"].get("run_id"))
             or "",
-            "created_at": _normalize_optional_string(
+            "created_at": normalize_optional_string(
                 right_payload["entry"].get("created_at")
             )
             or "",
-            "status": _normalize_optional_string(right_manifest.get("status")) or "",
-            "workflow_profile_id": _normalize_optional_string(
+            "status": normalize_optional_string(right_manifest.get("status")) or "",
+            "workflow_profile_id": normalize_optional_string(
                 right_manifest.get("workflow_profile_id")
             )
             or "",
-            "task_type": _normalize_optional_string(
-                _extract_mapping(right_manifest, "task_summary").get("task_type")
+            "task_type": normalize_optional_string(
+                extract_mapping(right_manifest, "task_summary").get("task_type")
             )
-            or _normalize_optional_string(right_profile_and_mode.get("task_type"))
+            or normalize_optional_string(right_profile_and_mode.get("task_type"))
             or "",
-            "formation_id": _normalize_optional_string(
+            "formation_id": normalize_optional_string(
                 right_profile_and_mode.get("formation_id")
             )
             or "",
             **right_artifact_summary,
-            "failure_class": _normalize_optional_string(
+            "failure_class": normalize_optional_string(
                 right_failure.get("failure_class")
             )
             or "",
-            "failed_stage": _normalize_optional_string(
-                right_failure.get("failed_stage")
-            )
+            "failed_stage": normalize_optional_string(right_failure.get("failed_stage"))
             or "",
-            "verification_status": _normalize_optional_string(
+            "verification_status": normalize_optional_string(
                 right_verification.get("status")
             )
             or "",
             "verification_passed": bool(right_verification.get("passed")),
-            "reassessed_level": _normalize_optional_string(
+            "reassessed_level": normalize_optional_string(
                 right_reassessment.get("reassessed_level")
             )
             or "",
             "followup_needed": bool(right_reassessment.get("needs_followup")),
             "reassessment_reason_codes": right_reassessment_reason_codes,
-            "evaluation_status": _normalize_optional_string(
+            "evaluation_status": normalize_optional_string(
                 right_realm_evaluation.get("status")
             )
             or "",
-            "evaluation_recommendation": _normalize_optional_string(
+            "evaluation_recommendation": normalize_optional_string(
                 right_realm_evaluation.get("recommendation")
             )
             or "",
@@ -356,15 +354,15 @@ def compare_run_archives(
                 right_realm_evaluation.get("requires_human_review")
             ),
             "evaluation_reason_codes": right_evaluation_reason_codes,
-            "governance_status": _normalize_optional_string(
+            "governance_status": normalize_optional_string(
                 right_governance.get("status")
             )
             or "",
             "governance_required": bool(
                 right_governance.get("requires_governance_override")
             ),
-            "task": _normalize_optional_string(
-                _extract_mapping(right_manifest, "task_summary").get("task")
+            "task": normalize_optional_string(
+                extract_mapping(right_manifest, "task_summary").get("task")
             )
             or "",
         },
@@ -372,10 +370,10 @@ def compare_run_archives(
             "same_status": left_manifest.get("status") == right_manifest.get("status"),
             "same_workflow_profile_id": left_manifest.get("workflow_profile_id")
             == right_manifest.get("workflow_profile_id"),
-            "same_task_type": _extract_mapping(left_manifest, "task_summary").get(
+            "same_task_type": extract_mapping(left_manifest, "task_summary").get(
                 "task_type"
             )
-            == _extract_mapping(right_manifest, "task_summary").get("task_type"),
+            == extract_mapping(right_manifest, "task_summary").get("task_type"),
             "same_formation_id": left_profile_and_mode.get("formation_id")
             == right_profile_and_mode.get("formation_id"),
             "same_expected_artifacts": left_artifact_summary["expected_artifacts"]
@@ -470,8 +468,8 @@ def compare_run_archives(
                 left_governance.get("requires_governance_override")
             )
             == bool(right_governance.get("requires_governance_override")),
-            "same_task": _extract_mapping(left_manifest, "task_summary").get("task")
-            == _extract_mapping(right_manifest, "task_summary").get("task"),
+            "same_task": extract_mapping(left_manifest, "task_summary").get("task")
+            == extract_mapping(right_manifest, "task_summary").get("task"),
             "failure_transition": _classify_failure_transition(
                 left_manifest, right_manifest, left_failure, right_failure
             ),
@@ -483,8 +481,8 @@ def compare_run_archives(
                 regressed_label="regressed",
             ),
             "reassessment_transition": _classify_risk_transition(
-                _normalize_optional_string(left_reassessment.get("reassessed_level")),
-                _normalize_optional_string(right_reassessment.get("reassessed_level")),
+                normalize_optional_string(left_reassessment.get("reassessed_level")),
+                normalize_optional_string(right_reassessment.get("reassessed_level")),
             ),
             "evaluation_transition": _classify_evaluation_transition(
                 left_realm_evaluation, right_realm_evaluation
@@ -579,14 +577,14 @@ def _merge_archive_entries(
     anonymous_entries: list[dict[str, Any]] = []
 
     for entry in index_entries:
-        run_id = _normalize_optional_string(entry.get("run_id"))
+        run_id = normalize_optional_string(entry.get("run_id"))
         if run_id:
             merged_by_run_id[run_id] = entry
         else:
             anonymous_entries.append(entry)
 
     for entry in scanned_entries:
-        run_id = _normalize_optional_string(entry.get("run_id"))
+        run_id = normalize_optional_string(entry.get("run_id"))
         if not run_id:
             anonymous_entries.append(entry)
             continue
@@ -595,13 +593,13 @@ def _merge_archive_entries(
 
     merged_entries = list(merged_by_run_id.values()) + anonymous_entries
     merged_entries.sort(
-        key=lambda item: _normalize_optional_string(item.get("created_at")) or ""
+        key=lambda item: normalize_optional_string(item.get("created_at")) or ""
     )
     return merged_entries
 
 
 def _hydrate_archive_index_entry(entry: dict[str, Any]) -> dict[str, Any]:
-    archive_dir_text = _normalize_optional_string(entry.get("archive_dir"))
+    archive_dir_text = normalize_optional_string(entry.get("archive_dir"))
     if not archive_dir_text:
         return entry
 
@@ -640,31 +638,31 @@ def _hydrate_archive_index_entry(entry: dict[str, Any]) -> dict[str, Any]:
     hydrated = dict(entry)
     if "task_type" not in hydrated:
         hydrated["task_type"] = (
-            _normalize_optional_string(task_summary.get("task_type"))
-            or _normalize_optional_string(profile_and_mode.get("task_type"))
+            normalize_optional_string(task_summary.get("task_type"))
+            or normalize_optional_string(profile_and_mode.get("task_type"))
             or ""
         )
     if "formation_id" not in hydrated:
         hydrated["formation_id"] = (
-            _normalize_optional_string(profile_and_mode.get("formation_id")) or ""
+            normalize_optional_string(profile_and_mode.get("formation_id")) or ""
         )
     if "policy_mode" not in hydrated:
         hydrated["policy_mode"] = (
-            _normalize_optional_string(profile_and_mode.get("policy_mode")) or ""
+            normalize_optional_string(profile_and_mode.get("policy_mode")) or ""
         )
     if "workflow_profile_id" not in hydrated:
         hydrated["workflow_profile_id"] = (
-            _normalize_optional_string(manifest.get("workflow_profile_id")) or ""
+            normalize_optional_string(manifest.get("workflow_profile_id")) or ""
         )
     if "status" not in hydrated:
-        hydrated["status"] = _normalize_optional_string(manifest.get("status")) or ""
+        hydrated["status"] = normalize_optional_string(manifest.get("status")) or ""
     if "failure_class" not in hydrated:
-        hydrated["failure_class"] = _normalize_optional_string(
+        hydrated["failure_class"] = normalize_optional_string(
             failure_signature.get("failure_class")
         )
     if "governance_status" not in hydrated:
         hydrated["governance_status"] = (
-            _normalize_optional_string(governance.get("status")) or ""
+            normalize_optional_string(governance.get("status")) or ""
         )
     if "governance_required" not in hydrated:
         hydrated["governance_required"] = bool(
@@ -710,35 +708,33 @@ def _scan_archive_dirs(archive_root: Path) -> list[dict[str, Any]]:
         )
         entries.append(
             {
-                "run_id": _normalize_optional_string(manifest.get("run_id"))
+                "run_id": normalize_optional_string(manifest.get("run_id"))
                 or path.name,
-                "created_at": _normalize_optional_string(manifest.get("created_at"))
+                "created_at": normalize_optional_string(manifest.get("created_at"))
                 or "",
-                "workflow_profile_id": _normalize_optional_string(
+                "workflow_profile_id": normalize_optional_string(
                     manifest.get("workflow_profile_id")
                 )
                 or "",
-                "task_type": _normalize_optional_string(
-                    _extract_mapping(manifest, "task_summary").get("task_type")
+                "task_type": normalize_optional_string(
+                    extract_mapping(manifest, "task_summary").get("task_type")
                 )
-                or _normalize_optional_string(profile_and_mode.get("task_type"))
+                or normalize_optional_string(profile_and_mode.get("task_type"))
                 or "",
-                "formation_id": _normalize_optional_string(
+                "formation_id": normalize_optional_string(
                     profile_and_mode.get("formation_id")
                 )
                 or "",
-                "policy_mode": _normalize_optional_string(
+                "policy_mode": normalize_optional_string(
                     profile_and_mode.get("policy_mode")
                 )
                 or "",
-                "status": _normalize_optional_string(manifest.get("status")) or "",
+                "status": normalize_optional_string(manifest.get("status")) or "",
                 "archive_dir": str(path),
-                "failure_class": _normalize_optional_string(
+                "failure_class": normalize_optional_string(
                     failure_signature.get("failure_class")
                 ),
-                "governance_status": _normalize_optional_string(
-                    governance.get("status")
-                )
+                "governance_status": normalize_optional_string(governance.get("status"))
                 or "",
                 "governance_required": bool(
                     governance.get("requires_governance_override")
@@ -752,8 +748,8 @@ def _scan_archive_dirs(archive_root: Path) -> list[dict[str, Any]]:
         raise FileNotFoundError(f"no run archives available in {archive_root}")
     entries.sort(
         key=lambda item: (
-            _normalize_optional_string(item.get("created_at")) or "",
-            _normalize_optional_string(item.get("run_id")) or "",
+            normalize_optional_string(item.get("created_at")) or "",
+            normalize_optional_string(item.get("run_id")) or "",
         )
     )
     return entries
@@ -768,39 +764,39 @@ def _filter_archive_entries(
     status: str | None,
     failure_class: str | None,
 ) -> list[dict[str, Any]]:
-    workflow_profile_id_text = _normalize_optional_string(workflow_profile_id)
-    task_type_text = _normalize_optional_string(task_type)
-    formation_id_text = _normalize_optional_string(formation_id)
-    status_text = _normalize_optional_string(status)
-    failure_class_text = _normalize_optional_string(failure_class)
+    workflow_profile_id_text = normalize_optional_string(workflow_profile_id)
+    task_type_text = normalize_optional_string(task_type)
+    formation_id_text = normalize_optional_string(formation_id)
+    status_text = normalize_optional_string(status)
+    failure_class_text = normalize_optional_string(failure_class)
 
     filtered: list[dict[str, Any]] = []
     for entry in entries:
         if (
             workflow_profile_id_text
-            and _normalize_optional_string(entry.get("workflow_profile_id"))
+            and normalize_optional_string(entry.get("workflow_profile_id"))
             != workflow_profile_id_text
         ):
             continue
         if (
             task_type_text
-            and _normalize_optional_string(entry.get("task_type")) != task_type_text
+            and normalize_optional_string(entry.get("task_type")) != task_type_text
         ):
             continue
         if (
             formation_id_text
-            and _normalize_optional_string(entry.get("formation_id"))
+            and normalize_optional_string(entry.get("formation_id"))
             != formation_id_text
         ):
             continue
         if (
             status_text
-            and _normalize_optional_string(entry.get("status")) != status_text
+            and normalize_optional_string(entry.get("status")) != status_text
         ):
             continue
         if (
             failure_class_text
-            and _normalize_optional_string(entry.get("failure_class"))
+            and normalize_optional_string(entry.get("failure_class"))
             != failure_class_text
         ):
             continue
@@ -813,7 +809,7 @@ def _find_archive_entry_by_run_id(
     run_id: str,
 ) -> dict[str, Any] | None:
     for entry in entries:
-        if _normalize_optional_string(entry.get("run_id")) == run_id:
+        if normalize_optional_string(entry.get("run_id")) == run_id:
             return entry
     return None
 
@@ -822,8 +818,8 @@ def _format_latest_archive_payload(payload: Mapping[str, Any]) -> str:
     archive_payload = {
         "archive_root": payload.get("archive_root"),
         "source": payload.get("source"),
-        "entry": _extract_mapping(payload, "latest_archive"),
-        "archive": _extract_mapping(payload, "archive"),
+        "entry": extract_mapping(payload, "latest_archive"),
+        "archive": extract_mapping(payload, "archive"),
     }
     lines = _format_archive_entry_payload(archive_payload).splitlines()
     if lines:
@@ -832,21 +828,21 @@ def _format_latest_archive_payload(payload: Mapping[str, Any]) -> str:
 
 
 def _format_archive_entry_payload(payload: Mapping[str, Any]) -> str:
-    entry = _extract_mapping(payload, "entry")
-    archive = _extract_mapping(payload, "archive")
-    manifest = _extract_mapping(archive, "manifest")
-    task_contract = _extract_mapping(archive, "task_contract")
-    failure_signature = _extract_mapping(archive, "failure_signature")
-    profile_and_mode = _extract_mapping(archive, "profile_and_mode")
-    verification_report = _extract_mapping(archive, "verification_report")
-    execution_result = _extract_mapping(archive, "execution_result")
-    governance = _extract_mapping(
-        _extract_mapping(archive, "residual_followup"), "governance"
+    entry = extract_mapping(payload, "entry")
+    archive = extract_mapping(payload, "archive")
+    manifest = extract_mapping(archive, "manifest")
+    task_contract = extract_mapping(archive, "task_contract")
+    failure_signature = extract_mapping(archive, "failure_signature")
+    profile_and_mode = extract_mapping(archive, "profile_and_mode")
+    verification_report = extract_mapping(archive, "verification_report")
+    execution_result = extract_mapping(archive, "execution_result")
+    governance = extract_mapping(
+        extract_mapping(archive, "residual_followup"), "governance"
     )
     baseline_compare_results = _extract_optional_mapping(
-        _extract_mapping(archive, "evaluation_summary"), "baseline_compare_results"
+        extract_mapping(archive, "evaluation_summary"), "baseline_compare_results"
     )
-    task_summary = _extract_mapping(manifest, "task_summary")
+    task_summary = extract_mapping(manifest, "task_summary")
     artifact_summary = _build_artifact_summary(
         task_contract=task_contract,
         execution_result=execution_result,
@@ -856,29 +852,29 @@ def _format_archive_entry_payload(payload: Mapping[str, Any]) -> str:
     return "\n".join(
         [
             "Archive entry",
-            f"source: {_normalize_optional_string(payload.get('source')) or 'unknown'}",
-            f"archive_root: {_normalize_optional_string(payload.get('archive_root')) or ''}",
-            f"run_id: {_normalize_optional_string(entry.get('run_id')) or ''}",
-            f"created_at: {_normalize_optional_string(entry.get('created_at')) or ''}",
-            f"workflow_profile_id: {_normalize_optional_string(manifest.get('workflow_profile_id')) or ''}",
-            f"task_type: {_normalize_optional_string(task_summary.get('task_type')) or ''}",
-            f"status: {_normalize_optional_string(manifest.get('status')) or ''}",
-            f"failure_class: {_normalize_optional_string(failure_signature.get('failure_class')) or 'none'}",
-            f"failed_stage: {_normalize_optional_string(failure_signature.get('failed_stage')) or 'none'}",
-            f"verification_status: {_normalize_optional_string(verification_report.get('status')) or ''}",
-            f"governance_status: {_normalize_optional_string(governance.get('status')) or ''}",
+            f"source: {normalize_optional_string(payload.get('source')) or 'unknown'}",
+            f"archive_root: {normalize_optional_string(payload.get('archive_root')) or ''}",
+            f"run_id: {normalize_optional_string(entry.get('run_id')) or ''}",
+            f"created_at: {normalize_optional_string(entry.get('created_at')) or ''}",
+            f"workflow_profile_id: {normalize_optional_string(manifest.get('workflow_profile_id')) or ''}",
+            f"task_type: {normalize_optional_string(task_summary.get('task_type')) or ''}",
+            f"status: {normalize_optional_string(manifest.get('status')) or ''}",
+            f"failure_class: {normalize_optional_string(failure_signature.get('failure_class')) or 'none'}",
+            f"failed_stage: {normalize_optional_string(failure_signature.get('failed_stage')) or 'none'}",
+            f"verification_status: {normalize_optional_string(verification_report.get('status')) or ''}",
+            f"governance_status: {normalize_optional_string(governance.get('status')) or ''}",
             f"governance_required: {'yes' if bool(governance.get('requires_governance_override')) else 'no'}",
-            f"formation_id: {_normalize_optional_string(profile_and_mode.get('formation_id')) or ''}",
-            f"policy_mode: {_normalize_optional_string(profile_and_mode.get('policy_mode')) or ''}",
+            f"formation_id: {normalize_optional_string(profile_and_mode.get('formation_id')) or ''}",
+            f"policy_mode: {normalize_optional_string(profile_and_mode.get('policy_mode')) or ''}",
             f"expected_artifacts: {_format_text_list(artifact_summary.get('expected_artifacts'))}",
             f"produced_artifacts: {_format_text_list(artifact_summary.get('produced_artifact_types'))}",
             f"produced_artifact_count: {int(artifact_summary.get('produced_artifact_count', 0) or 0)}",
-            f"baseline_compare_status: {_normalize_optional_string(artifact_summary.get('baseline_compare_status')) or 'none'}",
+            f"baseline_compare_status: {normalize_optional_string(artifact_summary.get('baseline_compare_status')) or 'none'}",
             f"baseline_artifacts: {_format_text_list(artifact_summary.get('baseline_compared_artifact_types'))}",
             f"baseline_status_counts: {_format_status_counts(artifact_summary.get('baseline_status_counts'))}",
             f"missing_expected_artifact_warning: {'yes' if bool(artifact_summary.get('missing_expected_artifact_warning')) else 'no'}",
-            f"task: {_normalize_optional_string(task_summary.get('task')) or ''}",
-            f"archive_dir: {_normalize_optional_string(entry.get('archive_dir')) or ''}",
+            f"task: {normalize_optional_string(task_summary.get('task')) or ''}",
+            f"archive_dir: {normalize_optional_string(entry.get('archive_dir')) or ''}",
         ]
     )
 
@@ -887,19 +883,19 @@ def _format_archive_summary_payload(payload: Mapping[str, Any]) -> str:
     entries = payload.get("entries")
     if not isinstance(entries, list):
         raise ValueError("archive summary payload is invalid")
-    filters = _extract_mapping(payload, "filters")
+    filters = extract_mapping(payload, "filters")
     lines = [
         "Archive summary",
-        f"source: {_normalize_optional_string(payload.get('source')) or 'unknown'}",
-        f"archive_root: {_normalize_optional_string(payload.get('archive_root')) or ''}",
+        f"source: {normalize_optional_string(payload.get('source')) or 'unknown'}",
+        f"archive_root: {normalize_optional_string(payload.get('archive_root')) or ''}",
         f"entry_count: {int(payload.get('entry_count', 0) or 0)}",
         f"limit: {int(payload.get('limit', 0) or 0)}",
         "filters: "
-        + f"workflow_profile_id={_normalize_optional_string(filters.get('workflow_profile_id')) or 'any'} "
-        + f"task_type={_normalize_optional_string(filters.get('task_type')) or 'any'} "
-        + f"formation_id={_normalize_optional_string(filters.get('formation_id')) or 'any'} "
-        + f"status={_normalize_optional_string(filters.get('status')) or 'any'} "
-        + f"failure_class={_normalize_optional_string(filters.get('failure_class')) or 'any'}",
+        + f"workflow_profile_id={normalize_optional_string(filters.get('workflow_profile_id')) or 'any'} "
+        + f"task_type={normalize_optional_string(filters.get('task_type')) or 'any'} "
+        + f"formation_id={normalize_optional_string(filters.get('formation_id')) or 'any'} "
+        + f"status={normalize_optional_string(filters.get('status')) or 'any'} "
+        + f"failure_class={normalize_optional_string(filters.get('failure_class')) or 'any'}",
     ]
     if not entries:
         lines.append("entries: none")
@@ -908,36 +904,36 @@ def _format_archive_summary_payload(payload: Mapping[str, Any]) -> str:
     for entry in entries:
         lines.append(
             "- "
-            + f"{_normalize_optional_string(entry.get('run_id')) or ''} | "
-            + f"{_normalize_optional_string(entry.get('created_at')) or ''} | "
-            + f"profile={_normalize_optional_string(entry.get('workflow_profile_id')) or ''} | "
-            + f"task_type={_normalize_optional_string(entry.get('task_type')) or ''} | "
-            + f"formation={_normalize_optional_string(entry.get('formation_id')) or ''} | "
-            + f"status={_normalize_optional_string(entry.get('status')) or ''} | "
-            + f"failure={_normalize_optional_string(entry.get('failure_class')) or 'none'} | "
-            + f"governance={_normalize_optional_string(entry.get('governance_status')) or 'clear'} | "
+            + f"{normalize_optional_string(entry.get('run_id')) or ''} | "
+            + f"{normalize_optional_string(entry.get('created_at')) or ''} | "
+            + f"profile={normalize_optional_string(entry.get('workflow_profile_id')) or ''} | "
+            + f"task_type={normalize_optional_string(entry.get('task_type')) or ''} | "
+            + f"formation={normalize_optional_string(entry.get('formation_id')) or ''} | "
+            + f"status={normalize_optional_string(entry.get('status')) or ''} | "
+            + f"failure={normalize_optional_string(entry.get('failure_class')) or 'none'} | "
+            + f"governance={normalize_optional_string(entry.get('governance_status')) or 'clear'} | "
             + f"gov_required={'yes' if bool(entry.get('governance_required')) else 'no'} | "
             + f"missing_expected={'yes' if bool(entry.get('missing_expected_artifact_warning')) else 'no'} | "
-            + f"archive_dir={_normalize_optional_string(entry.get('archive_dir')) or ''}"
+            + f"archive_dir={normalize_optional_string(entry.get('archive_dir')) or ''}"
         )
     return "\n".join(lines)
 
 
 def _format_archive_trend_summary(payload: Mapping[str, Any]) -> str:
-    filters = _extract_mapping(payload, "filters")
+    filters = extract_mapping(payload, "filters")
     oldest = _extract_optional_mapping(payload, "oldest")
     latest = _extract_optional_mapping(payload, "latest")
     lines = [
         "Archive trend summary",
-        f"source: {_normalize_optional_string(payload.get('source')) or 'unknown'}",
-        f"archive_root: {_normalize_optional_string(payload.get('archive_root')) or ''}",
+        f"source: {normalize_optional_string(payload.get('source')) or 'unknown'}",
+        f"archive_root: {normalize_optional_string(payload.get('archive_root')) or ''}",
         f"entry_count: {int(payload.get('entry_count', 0) or 0)}",
         "filters: "
-        + f"workflow_profile_id={_normalize_optional_string(filters.get('workflow_profile_id')) or 'any'} "
-        + f"task_type={_normalize_optional_string(filters.get('task_type')) or 'any'} "
-        + f"formation_id={_normalize_optional_string(filters.get('formation_id')) or 'any'} "
-        + f"status={_normalize_optional_string(filters.get('status')) or 'any'} "
-        + f"failure_class={_normalize_optional_string(filters.get('failure_class')) or 'any'}",
+        + f"workflow_profile_id={normalize_optional_string(filters.get('workflow_profile_id')) or 'any'} "
+        + f"task_type={normalize_optional_string(filters.get('task_type')) or 'any'} "
+        + f"formation_id={normalize_optional_string(filters.get('formation_id')) or 'any'} "
+        + f"status={normalize_optional_string(filters.get('status')) or 'any'} "
+        + f"failure_class={normalize_optional_string(filters.get('failure_class')) or 'any'}",
     ]
     if not int(payload.get("entry_count", 0) or 0):
         lines.append("range: none")
@@ -952,8 +948,8 @@ def _format_archive_trend_summary(payload: Mapping[str, Any]) -> str:
     lines.extend(
         [
             "range: "
-            + f"oldest={_normalize_optional_string(oldest.get('run_id')) or ''}@{_normalize_optional_string(oldest.get('created_at')) or ''} "
-            + f"latest={_normalize_optional_string(latest.get('run_id')) or ''}@{_normalize_optional_string(latest.get('created_at')) or ''}",
+            + f"oldest={normalize_optional_string(oldest.get('run_id')) or ''}@{normalize_optional_string(oldest.get('created_at')) or ''} "
+            + f"latest={normalize_optional_string(latest.get('run_id')) or ''}@{normalize_optional_string(latest.get('created_at')) or ''}",
             f"status_counts: {_format_status_counts(payload.get('status_counts'))}",
             f"task_type_counts: {_format_status_counts(payload.get('task_type_counts'))}",
             f"formation_counts: {_format_status_counts(payload.get('formation_counts'))}",
@@ -974,52 +970,52 @@ def _count_archive_field_values(
 ) -> dict[str, int]:
     counts: dict[str, int] = {}
     for entry in entries:
-        value = _normalize_optional_string(entry.get(field_name)) or default_value
+        value = normalize_optional_string(entry.get(field_name)) or default_value
         counts[value] = counts.get(value, 0) + 1
     return dict(sorted(counts.items(), key=lambda item: item[0]))
 
 
 def _format_archive_comparison(payload: Mapping[str, Any]) -> str:
-    left = _extract_mapping(payload, "left")
-    right = _extract_mapping(payload, "right")
-    comparison = _extract_mapping(payload, "comparison")
+    left = extract_mapping(payload, "left")
+    right = extract_mapping(payload, "right")
+    comparison = extract_mapping(payload, "comparison")
     return "\n".join(
         [
             "Archive comparison",
-            f"archive_root: {_normalize_optional_string(payload.get('archive_root')) or ''}",
+            f"archive_root: {normalize_optional_string(payload.get('archive_root')) or ''}",
             "left: "
-            + f"{_normalize_optional_string(left.get('run_id')) or ''} | "
-            + f"status={_normalize_optional_string(left.get('status')) or ''} | "
-            + f"profile={_normalize_optional_string(left.get('workflow_profile_id')) or ''} | "
-            + f"task_type={_normalize_optional_string(left.get('task_type')) or ''} | "
-            + f"formation={_normalize_optional_string(left.get('formation_id')) or ''} | "
-            + f"failure={_normalize_optional_string(left.get('failure_class')) or 'none'} | "
-            + f"stage={_normalize_optional_string(left.get('failed_stage')) or 'none'} | "
-            + f"verification={_normalize_optional_string(left.get('verification_status')) or ''} | "
-            + f"risk={_normalize_optional_string(left.get('reassessed_level')) or ''} | "
+            + f"{normalize_optional_string(left.get('run_id')) or ''} | "
+            + f"status={normalize_optional_string(left.get('status')) or ''} | "
+            + f"profile={normalize_optional_string(left.get('workflow_profile_id')) or ''} | "
+            + f"task_type={normalize_optional_string(left.get('task_type')) or ''} | "
+            + f"formation={normalize_optional_string(left.get('formation_id')) or ''} | "
+            + f"failure={normalize_optional_string(left.get('failure_class')) or 'none'} | "
+            + f"stage={normalize_optional_string(left.get('failed_stage')) or 'none'} | "
+            + f"verification={normalize_optional_string(left.get('verification_status')) or ''} | "
+            + f"risk={normalize_optional_string(left.get('reassessed_level')) or ''} | "
             + f"followup={'yes' if bool(left.get('followup_needed')) else 'no'} | "
             + f"reassessment_reasons={_format_reason_codes(left.get('reassessment_reason_codes'))} | "
-            + f"evaluation={_normalize_optional_string(left.get('evaluation_recommendation')) or ''} | "
+            + f"evaluation={normalize_optional_string(left.get('evaluation_recommendation')) or ''} | "
             + f"human_review={'yes' if bool(left.get('evaluation_human_review')) else 'no'} | "
             + f"evaluation_reasons={_format_reason_codes(left.get('evaluation_reason_codes'))} | "
-            + f"governance={_normalize_optional_string(left.get('governance_status')) or ''} | "
+            + f"governance={normalize_optional_string(left.get('governance_status')) or ''} | "
             + f"gov_required={'yes' if bool(left.get('governance_required')) else 'no'}",
             "right: "
-            + f"{_normalize_optional_string(right.get('run_id')) or ''} | "
-            + f"status={_normalize_optional_string(right.get('status')) or ''} | "
-            + f"profile={_normalize_optional_string(right.get('workflow_profile_id')) or ''} | "
-            + f"task_type={_normalize_optional_string(right.get('task_type')) or ''} | "
-            + f"formation={_normalize_optional_string(right.get('formation_id')) or ''} | "
-            + f"failure={_normalize_optional_string(right.get('failure_class')) or 'none'} | "
-            + f"stage={_normalize_optional_string(right.get('failed_stage')) or 'none'} | "
-            + f"verification={_normalize_optional_string(right.get('verification_status')) or ''} | "
-            + f"risk={_normalize_optional_string(right.get('reassessed_level')) or ''} | "
+            + f"{normalize_optional_string(right.get('run_id')) or ''} | "
+            + f"status={normalize_optional_string(right.get('status')) or ''} | "
+            + f"profile={normalize_optional_string(right.get('workflow_profile_id')) or ''} | "
+            + f"task_type={normalize_optional_string(right.get('task_type')) or ''} | "
+            + f"formation={normalize_optional_string(right.get('formation_id')) or ''} | "
+            + f"failure={normalize_optional_string(right.get('failure_class')) or 'none'} | "
+            + f"stage={normalize_optional_string(right.get('failed_stage')) or 'none'} | "
+            + f"verification={normalize_optional_string(right.get('verification_status')) or ''} | "
+            + f"risk={normalize_optional_string(right.get('reassessed_level')) or ''} | "
             + f"followup={'yes' if bool(right.get('followup_needed')) else 'no'} | "
             + f"reassessment_reasons={_format_reason_codes(right.get('reassessment_reason_codes'))} | "
-            + f"evaluation={_normalize_optional_string(right.get('evaluation_recommendation')) or ''} | "
+            + f"evaluation={normalize_optional_string(right.get('evaluation_recommendation')) or ''} | "
             + f"human_review={'yes' if bool(right.get('evaluation_human_review')) else 'no'} | "
             + f"evaluation_reasons={_format_reason_codes(right.get('evaluation_reason_codes'))} | "
-            + f"governance={_normalize_optional_string(right.get('governance_status')) or ''} | "
+            + f"governance={normalize_optional_string(right.get('governance_status')) or ''} | "
             + f"gov_required={'yes' if bool(right.get('governance_required')) else 'no'}",
             "comparison: "
             + f"same_status={'yes' if bool(comparison.get('same_status')) else 'no'} "
@@ -1044,23 +1040,23 @@ def _format_archive_comparison(payload: Mapping[str, Any]) -> str:
             + f"same_governance_required={'yes' if bool(comparison.get('same_governance_required')) else 'no'} "
             + f"same_task={'yes' if bool(comparison.get('same_task')) else 'no'}",
             "transitions: "
-            + f"failure={_normalize_optional_string(comparison.get('failure_transition')) or 'unknown'} "
-            + f"verification={_normalize_optional_string(comparison.get('verification_transition')) or 'unknown'} "
-            + f"reassessment={_normalize_optional_string(comparison.get('reassessment_transition')) or 'unknown'} "
-            + f"evaluation={_normalize_optional_string(comparison.get('evaluation_transition')) or 'unknown'} "
-            + f"governance={_normalize_optional_string(comparison.get('governance_transition')) or 'unknown'} "
-            + f"artifacts={_normalize_optional_string(comparison.get('artifact_transition')) or 'unknown'}",
+            + f"failure={normalize_optional_string(comparison.get('failure_transition')) or 'unknown'} "
+            + f"verification={normalize_optional_string(comparison.get('verification_transition')) or 'unknown'} "
+            + f"reassessment={normalize_optional_string(comparison.get('reassessment_transition')) or 'unknown'} "
+            + f"evaluation={normalize_optional_string(comparison.get('evaluation_transition')) or 'unknown'} "
+            + f"governance={normalize_optional_string(comparison.get('governance_transition')) or 'unknown'} "
+            + f"artifacts={normalize_optional_string(comparison.get('artifact_transition')) or 'unknown'}",
             "artifacts_left: "
             + f"expected={_format_text_list(left.get('expected_artifacts'))} "
             + f"produced={_format_text_list(left.get('produced_artifact_types'))}({int(left.get('produced_artifact_count', 0) or 0)}) "
-            + f"baseline_status={_normalize_optional_string(left.get('baseline_compare_status')) or 'none'} "
+            + f"baseline_status={normalize_optional_string(left.get('baseline_compare_status')) or 'none'} "
             + f"baseline_artifacts={_format_text_list(left.get('baseline_compared_artifact_types'))} "
             + f"status_counts={_format_status_counts(left.get('baseline_status_counts'))} "
             + f"missing_expected={'yes' if bool(left.get('missing_expected_artifact_warning')) else 'no'}",
             "artifacts_right: "
             + f"expected={_format_text_list(right.get('expected_artifacts'))} "
             + f"produced={_format_text_list(right.get('produced_artifact_types'))}({int(right.get('produced_artifact_count', 0) or 0)}) "
-            + f"baseline_status={_normalize_optional_string(right.get('baseline_compare_status')) or 'none'} "
+            + f"baseline_status={normalize_optional_string(right.get('baseline_compare_status')) or 'none'} "
             + f"baseline_artifacts={_format_text_list(right.get('baseline_compared_artifact_types'))} "
             + f"status_counts={_format_status_counts(right.get('baseline_status_counts'))} "
             + f"missing_expected={'yes' if bool(right.get('missing_expected_artifact_warning')) else 'no'}",
@@ -1079,13 +1075,13 @@ def _classify_failure_transition(
     left_failure: Mapping[str, Any],
     right_failure: Mapping[str, Any],
 ) -> str:
-    left_status = _normalize_optional_string(left_manifest.get("status")) or ""
-    right_status = _normalize_optional_string(right_manifest.get("status")) or ""
+    left_status = normalize_optional_string(left_manifest.get("status")) or ""
+    right_status = normalize_optional_string(right_manifest.get("status")) or ""
     left_failure_class = (
-        _normalize_optional_string(left_failure.get("failure_class")) or ""
+        normalize_optional_string(left_failure.get("failure_class")) or ""
     )
     right_failure_class = (
-        _normalize_optional_string(right_failure.get("failure_class")) or ""
+        normalize_optional_string(right_failure.get("failure_class")) or ""
     )
 
     left_effective_success = left_status == "success" and not left_failure_class
@@ -1119,8 +1115,8 @@ def _classify_risk_transition(
     left_level: str | None,
     right_level: str | None,
 ) -> str:
-    left_normalized = _normalize_optional_string(left_level) or ""
-    right_normalized = _normalize_optional_string(right_level) or ""
+    left_normalized = normalize_optional_string(left_level) or ""
+    right_normalized = normalize_optional_string(right_level) or ""
     if left_normalized == right_normalized:
         return "unchanged"
     if (
@@ -1140,10 +1136,10 @@ def _classify_evaluation_transition(
     left_requires_review = bool(left_evaluation.get("requires_human_review"))
     right_requires_review = bool(right_evaluation.get("requires_human_review"))
     left_recommendation = (
-        _normalize_optional_string(left_evaluation.get("recommendation")) or ""
+        normalize_optional_string(left_evaluation.get("recommendation")) or ""
     )
     right_recommendation = (
-        _normalize_optional_string(right_evaluation.get("recommendation")) or ""
+        normalize_optional_string(right_evaluation.get("recommendation")) or ""
     )
 
     if (
@@ -1172,22 +1168,22 @@ def _build_artifact_summary(
             artifact_type
             for artifact in artifacts
             if isinstance(artifact, Mapping)
-            for artifact_type in [_normalize_optional_string(artifact.get("type"))]
+            for artifact_type in [normalize_optional_string(artifact.get("type"))]
             if artifact_type
         }
     )
     warning_codes = _verification_warning_codes(verification_report)
     return {
-        "expected_artifacts": _normalize_string_list(
+        "expected_artifacts": normalize_string_list_sorted(
             task_contract.get("expected_artifacts")
         ),
         "produced_artifact_types": produced_artifact_types,
         "produced_artifact_count": len(artifacts),
-        "baseline_compare_status": _normalize_optional_string(
+        "baseline_compare_status": normalize_optional_string(
             baseline_compare_results.get("status")
         )
         or "",
-        "baseline_compared_artifact_types": _normalize_string_list(
+        "baseline_compared_artifact_types": normalize_string_list_sorted(
             baseline_compare_results.get("compared_artifact_types")
         ),
         "baseline_status_counts": _normalize_status_counts(
@@ -1217,16 +1213,16 @@ def _classify_artifact_transition(
         return "regressed" if right_score > left_score else "improved"
 
     if (
-        _normalize_string_list(left_summary.get("expected_artifacts"))
-        == _normalize_string_list(right_summary.get("expected_artifacts"))
-        and _normalize_string_list(left_summary.get("produced_artifact_types"))
-        == _normalize_string_list(right_summary.get("produced_artifact_types"))
+        normalize_string_list(left_summary.get("expected_artifacts"))
+        == normalize_string_list(right_summary.get("expected_artifacts"))
+        and normalize_string_list(left_summary.get("produced_artifact_types"))
+        == normalize_string_list(right_summary.get("produced_artifact_types"))
         and int(left_summary.get("produced_artifact_count", 0) or 0)
         == int(right_summary.get("produced_artifact_count", 0) or 0)
-        and _normalize_optional_string(left_summary.get("baseline_compare_status"))
-        == _normalize_optional_string(right_summary.get("baseline_compare_status"))
-        and _normalize_string_list(left_summary.get("baseline_compared_artifact_types"))
-        == _normalize_string_list(right_summary.get("baseline_compared_artifact_types"))
+        and normalize_optional_string(left_summary.get("baseline_compare_status"))
+        == normalize_optional_string(right_summary.get("baseline_compare_status"))
+        and normalize_string_list(left_summary.get("baseline_compared_artifact_types"))
+        == normalize_string_list(right_summary.get("baseline_compared_artifact_types"))
         and _normalize_status_counts(left_summary.get("baseline_status_counts"))
         == _normalize_status_counts(right_summary.get("baseline_status_counts"))
     ):
@@ -1263,7 +1259,7 @@ def _build_comparison_highlights(comparison: Mapping[str, Any]) -> str:
         ("governance_transition", "governance"),
         ("artifact_transition", "artifacts"),
     ):
-        transition = _normalize_optional_string(comparison.get(field_name)) or "unknown"
+        transition = normalize_optional_string(comparison.get(field_name)) or "unknown"
         if transition != "unchanged":
             highlights.append(f"{label} {transition}")
 
@@ -1312,8 +1308,8 @@ def _format_text_delta(
     removed_values: object | None,
 ) -> str:
     parts: list[str] = []
-    added_values_list = _normalize_string_list(added_values)
-    removed_values_list = _normalize_string_list(removed_values)
+    added_values_list = normalize_string_list(added_values)
+    removed_values_list = normalize_string_list(removed_values)
     if added_values_list:
         parts.append("+" + ",".join(added_values_list))
     if removed_values_list:
@@ -1336,8 +1332,8 @@ def _format_named_delta(
     delta = _format_text_delta(added_values, removed_values)
     if not delta:
         return ""
-    added_values_list = _normalize_string_list(added_values)
-    removed_values_list = _normalize_string_list(removed_values)
+    added_values_list = normalize_string_list(added_values)
+    removed_values_list = normalize_string_list(removed_values)
     added_text = ",".join(added_values_list) if added_values_list else "none"
     removed_text = ",".join(removed_values_list) if removed_values_list else "none"
     return f"{label}(+{added_text}; -{removed_text})"
@@ -1350,7 +1346,7 @@ def _format_artifact_diff_line(
 ) -> str:
     parts = [
         "artifact_diff: "
-        + f"transition={_normalize_optional_string(comparison.get('artifact_transition')) or 'unknown'}"
+        + f"transition={normalize_optional_string(comparison.get('artifact_transition')) or 'unknown'}"
     ]
     for segment in (
         _format_named_delta(
@@ -1386,7 +1382,7 @@ def _format_artifact_diff_line(
 
 
 def _format_text_list(values: object | None) -> str:
-    normalized = _normalize_string_list(values)
+    normalized = normalize_string_list(values)
     if not normalized:
         return "none"
     return ",".join(normalized)
@@ -1409,7 +1405,7 @@ def _verification_warning_codes(verification_report: Mapping[str, Any]) -> list[
             warning_code
             for warning in verification_report.get("warnings", [])
             if isinstance(warning, Mapping)
-            for warning_code in [_normalize_optional_string(warning.get("code"))]
+            for warning_code in [normalize_optional_string(warning.get("code"))]
             if warning_code
         }
     )
@@ -1422,13 +1418,6 @@ def _read_json_mapping(path: Path) -> dict[str, Any]:
     return dict(payload)
 
 
-def _extract_mapping(payload: Mapping[str, Any], key: str) -> dict[str, Any]:
-    value = payload.get(key)
-    if not isinstance(value, Mapping):
-        raise ValueError(f"{key} payload is invalid")
-    return dict(value)
-
-
 def _extract_optional_mapping(payload: Mapping[str, Any], key: str) -> dict[str, Any]:
     value = payload.get(key)
     if isinstance(value, Mapping):
@@ -1436,29 +1425,12 @@ def _extract_optional_mapping(payload: Mapping[str, Any], key: str) -> dict[str,
     return {}
 
 
-def _normalize_optional_string(value: object | None) -> str | None:
-    text = str(value).strip() if value is not None else ""
-    return text or None
-
-
-def _normalize_string_list(value: object | None) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    normalized = {
-        item_text
-        for item in value
-        for item_text in [_normalize_optional_string(item)]
-        if item_text
-    }
-    return sorted(normalized)
-
-
 def _normalize_status_counts(value: object | None) -> dict[str, int]:
     if not isinstance(value, Mapping):
         return {}
     normalized: dict[str, int] = {}
     for raw_key, raw_count in value.items():
-        key = _normalize_optional_string(raw_key)
+        key = normalize_optional_string(raw_key)
         if not key:
             continue
         try:

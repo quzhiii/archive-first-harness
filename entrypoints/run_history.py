@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+
+from entrypoints._utils import normalize_optional_string
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,9 +57,11 @@ def build_run_history_entry(
         raise TypeError("export_result must be a mapping")
 
     timestamp = _coerce_created_at(created_at)
-    batch_name = _normalize_optional_string(batch_result.get("batch_name")) or "batch"
-    resolved_run_id = _normalize_optional_string(run_id) or build_run_id(batch_name, created_at=timestamp)
-    output_dir = _normalize_optional_string(export_result.get("output_dir"))
+    batch_name = normalize_optional_string(batch_result.get("batch_name")) or "batch"
+    resolved_run_id = normalize_optional_string(run_id) or build_run_id(
+        batch_name, created_at=timestamp
+    )
+    output_dir = normalize_optional_string(export_result.get("output_dir"))
     if not output_dir:
         raise ValueError("export_result.output_dir must not be empty")
 
@@ -71,9 +75,11 @@ def build_run_history_entry(
         stopped_early=bool(batch_result.get("stopped_early", False)),
         output_dir=output_dir,
         written_files=_coerce_written_files(export_result.get("written_files")),
-        exported_formats=_coerce_exported_formats(export_result.get("exported_formats")),
-        tag=_normalize_optional_string(tag),
-        notes=_normalize_optional_string(notes),
+        exported_formats=_coerce_exported_formats(
+            export_result.get("exported_formats")
+        ),
+        tag=normalize_optional_string(tag),
+        notes=normalize_optional_string(notes),
     )
 
 
@@ -98,7 +104,9 @@ def append_run_history_entry(
     manifest_path = _resolve_history_file(history_file, export_result)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(json.dumps(entry.as_dict(), ensure_ascii=True, sort_keys=True) + "\n")
+        handle.write(
+            json.dumps(entry.as_dict(), ensure_ascii=True, sort_keys=True) + "\n"
+        )
     return {
         "history_file": str(manifest_path),
         "run_id": entry.run_id,
@@ -106,7 +114,9 @@ def append_run_history_entry(
     }
 
 
-def list_run_history(history_file: str | Path, *, limit: int | None = None) -> list[dict[str, Any]]:
+def list_run_history(
+    history_file: str | Path, *, limit: int | None = None
+) -> list[dict[str, Any]]:
     manifest_path = Path(history_file)
     if not manifest_path.exists():
         return []
@@ -127,13 +137,15 @@ def list_run_history(history_file: str | Path, *, limit: int | None = None) -> l
     return entries[-limit:]
 
 
-def _resolve_history_file(history_file: str | Path | None, export_result: Mapping[str, Any]) -> Path:
+def _resolve_history_file(
+    history_file: str | Path | None, export_result: Mapping[str, Any]
+) -> Path:
     if history_file is not None:
-        history_text = _normalize_optional_string(history_file)
+        history_text = normalize_optional_string(history_file)
         if not history_text:
             raise ValueError("history_file must not be empty")
         return Path(history_text)
-    output_dir = _normalize_optional_string(export_result.get("output_dir"))
+    output_dir = normalize_optional_string(export_result.get("output_dir"))
     if not output_dir:
         raise ValueError("history_file requires export_result.output_dir to be set")
     return Path(output_dir) / "run_history.jsonl"
@@ -146,8 +158,8 @@ def _coerce_written_files(value: object) -> list[dict[str, str]]:
     for item in value:
         if not isinstance(item, Mapping):
             continue
-        path_value = _normalize_optional_string(item.get("path"))
-        format_value = _normalize_optional_string(item.get("format"))
+        path_value = normalize_optional_string(item.get("path"))
+        format_value = normalize_optional_string(item.get("format"))
         if not path_value or not format_value:
             continue
         written_files.append({"format": format_value, "path": path_value})
@@ -159,7 +171,7 @@ def _coerce_exported_formats(value: object) -> list[str]:
         return []
     formats: list[str] = []
     for item in value:
-        text = _normalize_optional_string(item)
+        text = normalize_optional_string(item)
         if text:
             formats.append(text)
     return formats
@@ -178,7 +190,7 @@ def _format_created_at(value: datetime) -> str:
 
 
 def _normalize_run_fragment(value: object | None) -> str | None:
-    text = _normalize_optional_string(value)
+    text = normalize_optional_string(value)
     if not text:
         return None
     characters: list[str] = []
@@ -197,8 +209,3 @@ def _normalize_run_fragment(value: object | None) -> str | None:
             previous_was_separator = True
     normalized = "".join(characters).strip("_-")
     return normalized or None
-
-
-def _normalize_optional_string(value: object | None) -> str | None:
-    text = str(value).strip() if value is not None else ""
-    return text or None

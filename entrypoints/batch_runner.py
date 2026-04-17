@@ -6,8 +6,13 @@ import json
 from pathlib import Path
 from typing import Any
 
+from entrypoints._utils import normalize_optional_string
 from entrypoints.settings import Settings
-from entrypoints.task_runner import SurfaceTaskRequest, run_task_request, surface_result_succeeded
+from entrypoints.task_runner import (
+    SurfaceTaskRequest,
+    run_task_request,
+    surface_result_succeeded,
+)
 
 
 @dataclass(slots=True)
@@ -19,13 +24,12 @@ class SurfaceBatchRequest:
 
     def __post_init__(self) -> None:
         self.tasks = list(self.tasks or [])
-        self.batch_name = _normalize_optional_string(self.batch_name)
+        self.batch_name = normalize_optional_string(self.batch_name)
         self.metadata = dict(self.metadata or {})
         if not isinstance(self.stop_on_error, bool):
             raise TypeError("stop_on_error must be a boolean")
         if not self.tasks:
             raise ValueError("tasks must not be empty")
-
 
 
 def run_batch_request(
@@ -94,7 +98,6 @@ def run_batch_request(
     }
 
 
-
 def load_batch_request_file(
     path: str | Path,
     *,
@@ -105,23 +108,35 @@ def load_batch_request_file(
     suffix = batch_path.suffix.lower()
     if suffix == ".json":
         payload = json.loads(batch_path.read_text(encoding="utf-8"))
-        if isinstance(payload, Sequence) and not isinstance(payload, (str, bytes, bytearray)):
+        if isinstance(payload, Sequence) and not isinstance(
+            payload, (str, bytes, bytearray)
+        ):
             return SurfaceBatchRequest(
                 tasks=list(payload),
                 batch_name=batch_name or batch_path.stem,
-                stop_on_error=bool(stop_on_error) if stop_on_error is not None else False,
+                stop_on_error=bool(stop_on_error)
+                if stop_on_error is not None
+                else False,
             )
         if not isinstance(payload, Mapping):
-            raise TypeError("batch json must be a list of tasks or a mapping with tasks")
+            raise TypeError(
+                "batch json must be a list of tasks or a mapping with tasks"
+            )
         tasks = payload.get("tasks")
-        if not isinstance(tasks, Sequence) or isinstance(tasks, (str, bytes, bytearray)):
+        if not isinstance(tasks, Sequence) or isinstance(
+            tasks, (str, bytes, bytearray)
+        ):
             raise TypeError("batch json mapping must contain a tasks sequence")
-        raw_stop_on_error = payload.get("stop_on_error") if stop_on_error is None else stop_on_error
+        raw_stop_on_error = (
+            payload.get("stop_on_error") if stop_on_error is None else stop_on_error
+        )
         raw_metadata = payload.get("metadata")
         metadata = dict(raw_metadata) if isinstance(raw_metadata, Mapping) else {}
         return SurfaceBatchRequest(
             tasks=list(tasks),
-            batch_name=batch_name or _normalize_optional_string(payload.get("batch_name")) or batch_path.stem,
+            batch_name=batch_name
+            or normalize_optional_string(payload.get("batch_name"))
+            or batch_path.stem,
             stop_on_error=bool(raw_stop_on_error),
             metadata=metadata,
         )
@@ -143,7 +158,6 @@ def load_batch_request_file(
     raise ValueError("batch file must use .json or .jsonl")
 
 
-
 def _coerce_surface_batch_request(
     request: SurfaceBatchRequest | Mapping[str, object],
 ) -> SurfaceBatchRequest:
@@ -159,23 +173,23 @@ def _coerce_surface_batch_request(
     metadata = dict(raw_metadata) if isinstance(raw_metadata, Mapping) else {}
     return SurfaceBatchRequest(
         tasks=list(tasks),
-        batch_name=_normalize_optional_string(request.get("batch_name")),
+        batch_name=normalize_optional_string(request.get("batch_name")),
         stop_on_error=bool(request.get("stop_on_error", False)),
         metadata=metadata,
     )
 
 
-
-def _extract_task_label(task_request: SurfaceTaskRequest | Mapping[str, object], index: int) -> str:
+def _extract_task_label(
+    task_request: SurfaceTaskRequest | Mapping[str, object], index: int
+) -> str:
     if isinstance(task_request, SurfaceTaskRequest):
         return task_request.task
     if isinstance(task_request, Mapping):
         task_value = task_request.get("task")
-        text = _normalize_optional_string(task_value)
+        text = normalize_optional_string(task_value)
         if text:
             return text
     return f"task-{index}"
-
 
 
 def _build_batch_summary(
@@ -193,9 +207,3 @@ def _build_batch_summary(
     if stopped_early:
         return summary + " Stopped early after the first failure."
     return summary
-
-
-
-def _normalize_optional_string(value: object | None) -> str | None:
-    text = str(value).strip() if value is not None else ""
-    return text or None

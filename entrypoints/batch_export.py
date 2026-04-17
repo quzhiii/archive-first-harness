@@ -1,10 +1,12 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import json
 from pathlib import Path
 from typing import Any
+
+from entrypoints._utils import json_dumps, normalize_optional_string
 
 
 @dataclass(slots=True)
@@ -16,11 +18,11 @@ class BatchExportOptions:
     write_markdown_summary: bool = True
 
     def __post_init__(self) -> None:
-        output_dir_text = _normalize_optional_string(self.output_dir)
+        output_dir_text = normalize_optional_string(self.output_dir)
         if not output_dir_text:
             raise ValueError("output_dir must not be empty")
         self.output_dir = Path(output_dir_text)
-        self.base_name = _normalize_optional_string(self.base_name)
+        self.base_name = normalize_optional_string(self.base_name)
         if not isinstance(self.write_json, bool):
             raise TypeError("write_json must be a boolean")
         if not isinstance(self.write_jsonl, bool):
@@ -46,14 +48,14 @@ def export_batch_results(
 
     base_name = _resolve_base_name(
         export_options.base_name,
-        _normalize_optional_string(batch_result.get("batch_name")),
+        normalize_optional_string(batch_result.get("batch_name")),
     )
     written_files: list[dict[str, str]] = []
     exported_formats: list[str] = []
 
     if export_options.write_json:
         json_path = output_dir / f"{base_name}.json"
-        json_path.write_text(_json_dumps(batch_result), encoding="utf-8")
+        json_path.write_text(json_dumps(batch_result), encoding="utf-8")
         written_files.append({"format": "json", "path": str(json_path)})
         exported_formats.append("json")
 
@@ -86,42 +88,58 @@ def _coerce_batch_export_options(
         raise TypeError("options must be a BatchExportOptions or mapping")
     return BatchExportOptions(
         output_dir=options.get("output_dir") or "",
-        base_name=_normalize_optional_string(options.get("base_name")),
+        base_name=normalize_optional_string(options.get("base_name")),
         write_json=bool(options.get("write_json", True)),
         write_jsonl=bool(options.get("write_jsonl", True)),
         write_markdown_summary=bool(options.get("write_markdown_summary", True)),
     )
 
 
-def _json_dumps(payload: Mapping[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True)
-
-
 def _build_jsonl_payload(batch_result: Mapping[str, Any]) -> str:
-    rows = [_build_jsonl_row(item, index) for index, item in enumerate(_extract_results(batch_result))]
+    rows = [
+        _build_jsonl_row(item, index)
+        for index, item in enumerate(_extract_results(batch_result))
+    ]
     if not rows:
         return ""
-    return "\n".join(json.dumps(row, ensure_ascii=True, sort_keys=True) for row in rows) + "\n"
+    return (
+        "\n".join(json.dumps(row, ensure_ascii=True, sort_keys=True) for row in rows)
+        + "\n"
+    )
 
 
 def _build_jsonl_row(result_item: Mapping[str, Any], index: int) -> dict[str, Any]:
     surface_result = result_item.get("result")
-    execution_result = surface_result.get("execution_result") if isinstance(surface_result, Mapping) else None
-    verification_report = surface_result.get("verification_report") if isinstance(surface_result, Mapping) else None
+    execution_result = (
+        surface_result.get("execution_result")
+        if isinstance(surface_result, Mapping)
+        else None
+    )
+    verification_report = (
+        surface_result.get("verification_report")
+        if isinstance(surface_result, Mapping)
+        else None
+    )
     error_payload = result_item.get("error")
     return {
         "task_index": result_item.get("task_index", index),
-        "task": _normalize_optional_string(result_item.get("task")) or f"task-{index}",
-        "status": _normalize_optional_string(result_item.get("status")) or "unknown",
+        "task": normalize_optional_string(result_item.get("task")) or f"task-{index}",
+        "status": normalize_optional_string(result_item.get("status")) or "unknown",
         "workflow_profile_id": _extract_workflow_profile_id(result_item),
-        "execution_status": execution_result.get("status") if isinstance(execution_result, Mapping) else None,
-        "verification_passed": verification_report.get("passed") if isinstance(verification_report, Mapping) else None,
-        "error_type": error_payload.get("type") if isinstance(error_payload, Mapping) else None,
+        "execution_status": execution_result.get("status")
+        if isinstance(execution_result, Mapping)
+        else None,
+        "verification_passed": verification_report.get("passed")
+        if isinstance(verification_report, Mapping)
+        else None,
+        "error_type": error_payload.get("type")
+        if isinstance(error_payload, Mapping)
+        else None,
     }
 
 
 def _build_markdown_summary(batch_result: Mapping[str, Any]) -> str:
-    batch_name = _normalize_optional_string(batch_result.get("batch_name")) or "batch"
+    batch_name = normalize_optional_string(batch_result.get("batch_name")) or "batch"
     total_tasks = int(batch_result.get("total_tasks", 0) or 0)
     completed_tasks = int(batch_result.get("completed_tasks", 0) or 0)
     failed_tasks = int(batch_result.get("failed_tasks", 0) or 0)
@@ -129,7 +147,11 @@ def _build_markdown_summary(batch_result: Mapping[str, Any]) -> str:
     lines = [
         f"# Batch Summary: {batch_name}",
         "",
-        "- Summary: " + (_normalize_optional_string(batch_result.get("summary")) or "No summary recorded."),
+        "- Summary: "
+        + (
+            normalize_optional_string(batch_result.get("summary"))
+            or "No summary recorded."
+        ),
         f"- Total tasks: {total_tasks}",
         f"- Completed tasks: {completed_tasks}",
         f"- Failed tasks: {failed_tasks}",
@@ -142,8 +164,10 @@ def _build_markdown_summary(batch_result: Mapping[str, Any]) -> str:
     results = _extract_results(batch_result)
     for index, item in enumerate(results):
         task_index = item.get("task_index", index)
-        task_text = _truncate_text(_normalize_optional_string(item.get("task")) or f"task-{task_index}", 120)
-        status = _normalize_optional_string(item.get("status")) or "unknown"
+        task_text = _truncate_text(
+            normalize_optional_string(item.get("task")) or f"task-{task_index}", 120
+        )
+        status = normalize_optional_string(item.get("status")) or "unknown"
         workflow_profile_id = _extract_workflow_profile_id(item)
         line = f"- [{task_index}] `{status}`"
         if workflow_profile_id:
@@ -163,14 +187,18 @@ def _build_markdown_summary(batch_result: Mapping[str, Any]) -> str:
 def _build_failure_lines(results: Sequence[Mapping[str, Any]]) -> list[str]:
     lines: list[str] = []
     for index, item in enumerate(results):
-        if _normalize_optional_string(item.get("status")) != "failed":
+        if normalize_optional_string(item.get("status")) != "failed":
             continue
         task_index = item.get("task_index", index)
-        task_text = _truncate_text(_normalize_optional_string(item.get("task")) or f"task-{task_index}", 100)
+        task_text = _truncate_text(
+            normalize_optional_string(item.get("task")) or f"task-{task_index}", 100
+        )
         error_payload = item.get("error")
         if isinstance(error_payload, Mapping):
-            error_type = _normalize_optional_string(error_payload.get("type")) or "error"
-            error_message = _truncate_text(_normalize_optional_string(error_payload.get("message")) or "", 100)
+            error_type = normalize_optional_string(error_payload.get("type")) or "error"
+            error_message = _truncate_text(
+                normalize_optional_string(error_payload.get("message")) or "", 100
+            )
             detail = f"{error_type}: {error_message}".strip(": ")
         else:
             detail = "surface result reported failure"
@@ -180,7 +208,9 @@ def _build_failure_lines(results: Sequence[Mapping[str, Any]]) -> list[str]:
 
 def _extract_results(batch_result: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     raw_results = batch_result.get("results")
-    if not isinstance(raw_results, Sequence) or isinstance(raw_results, (str, bytes, bytearray)):
+    if not isinstance(raw_results, Sequence) or isinstance(
+        raw_results, (str, bytes, bytearray)
+    ):
         return []
     extracted: list[Mapping[str, Any]] = []
     for item in raw_results:
@@ -195,14 +225,18 @@ def _extract_workflow_profile_id(result_item: Mapping[str, Any]) -> str | None:
         return None
     surface_payload = surface_result.get("surface")
     if isinstance(surface_payload, Mapping):
-        profile_id = _normalize_optional_string(surface_payload.get("workflow_profile_id"))
+        profile_id = normalize_optional_string(
+            surface_payload.get("workflow_profile_id")
+        )
         if profile_id:
             return profile_id
     evaluation_input_bundle = surface_result.get("evaluation_input_bundle")
     if isinstance(evaluation_input_bundle, Mapping):
         task_contract_summary = evaluation_input_bundle.get("task_contract_summary")
         if isinstance(task_contract_summary, Mapping):
-            profile_id = _normalize_optional_string(task_contract_summary.get("workflow_profile_id"))
+            profile_id = normalize_optional_string(
+                task_contract_summary.get("workflow_profile_id")
+            )
             if profile_id:
                 return profile_id
     return None
@@ -217,7 +251,7 @@ def _resolve_base_name(base_name: str | None, batch_name: str | None) -> str:
 
 
 def _normalize_base_name(value: object | None) -> str | None:
-    text = _normalize_optional_string(value)
+    text = normalize_optional_string(value)
     if not text:
         return None
     characters: list[str] = []
@@ -242,8 +276,3 @@ def _truncate_text(value: str, max_length: int) -> str:
     if len(value) <= max_length:
         return value
     return value[: max_length - 3].rstrip() + "..."
-
-
-def _normalize_optional_string(value: object | None) -> str | None:
-    text = str(value).strip() if value is not None else ""
-    return text or None

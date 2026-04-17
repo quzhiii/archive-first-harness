@@ -1,12 +1,12 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
-from enum import Enum
 import json
 from pathlib import Path
 from typing import Any
+
+from entrypoints._utils import normalize_optional_string, to_json_value
 
 
 DEFAULT_FORMATION_ID = "default"
@@ -101,7 +101,9 @@ def write_run_archive(
         "policy_mode": profile_and_mode["policy_mode"],
         "status": manifest["status"],
         "archive_dir": str(archive_dir),
-        "failure_class": _normalize_optional_string(failure_signature.get("failure_class")),
+        "failure_class": normalize_optional_string(
+            failure_signature.get("failure_class")
+        ),
     }
     index_file = append_run_archive_index(archive_root_path / "index.jsonl", index_row)
 
@@ -124,7 +126,9 @@ def append_run_archive_index(
     index_path = Path(index_file)
     index_path.parent.mkdir(parents=True, exist_ok=True)
     with index_path.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(json.dumps(_to_json_value(entry), ensure_ascii=True, sort_keys=True) + "\n")
+        handle.write(
+            json.dumps(to_json_value(entry), ensure_ascii=True, sort_keys=True) + "\n"
+        )
     return index_path
 
 
@@ -142,8 +146,8 @@ def _build_manifest(
         "run_id": run_id,
         "created_at": _format_created_at(created_at),
         "workflow_profile_id": workflow_profile_id,
-        "formation_id": _normalize_optional_string(formation_id) or DEFAULT_FORMATION_ID,
-        "policy_mode": _normalize_optional_string(policy_mode) or DEFAULT_POLICY_MODE,
+        "formation_id": normalize_optional_string(formation_id) or DEFAULT_FORMATION_ID,
+        "policy_mode": normalize_optional_string(policy_mode) or DEFAULT_POLICY_MODE,
         "task_summary": _build_task_summary(surface_request, run_result),
         "status": _build_run_status(run_result),
         "archive_version": ARCHIVE_VERSION,
@@ -162,18 +166,24 @@ def _build_profile_and_mode(
     task_contract = _coerce_mapping(run_result.get("task_contract"))
     return {
         "workflow_profile_id": workflow_profile_id,
-        "task_type": _normalize_optional_string(task_contract.get("task_type")) or "",
-        "formation_id": _normalize_optional_string(formation_id) or DEFAULT_FORMATION_ID,
-        "policy_mode": _normalize_optional_string(policy_mode) or DEFAULT_POLICY_MODE,
-        "profile_resolution": _coerce_mapping(surface_payload.get("profile_resolution")),
+        "task_type": normalize_optional_string(task_contract.get("task_type")) or "",
+        "formation_id": normalize_optional_string(formation_id) or DEFAULT_FORMATION_ID,
+        "policy_mode": normalize_optional_string(policy_mode) or DEFAULT_POLICY_MODE,
+        "profile_resolution": _coerce_mapping(
+            surface_payload.get("profile_resolution")
+        ),
     }
 
 
 def _build_evaluation_summary(run_result: Mapping[str, Any]) -> dict[str, Any]:
     return {
-        "evaluation_input_bundle": _coerce_mapping(run_result.get("evaluation_input_bundle")),
+        "evaluation_input_bundle": _coerce_mapping(
+            run_result.get("evaluation_input_bundle")
+        ),
         "realm_evaluation": _coerce_mapping(run_result.get("realm_evaluation")),
-        "baseline_compare_results": _coerce_mapping(run_result.get("baseline_compare_results")),
+        "baseline_compare_results": _coerce_mapping(
+            run_result.get("baseline_compare_results")
+        ),
     }
 
 
@@ -193,9 +203,7 @@ def _build_final_output(run_result: Mapping[str, Any]) -> dict[str, Any]:
         "verifier_handoff",
     )
     return {
-        key: _to_json_value(run_result.get(key))
-        for key in keys
-        if key in run_result
+        key: to_json_value(run_result.get(key)) for key in keys if key in run_result
     }
 
 
@@ -210,8 +218,8 @@ def _build_context_plan(
     working_context_summary = _coerce_mapping(run_result.get("working_context_summary"))
     return {
         "workflow_profile_id": workflow_profile_id,
-        "formation_id": _normalize_optional_string(formation_id) or DEFAULT_FORMATION_ID,
-        "policy_mode": _normalize_optional_string(policy_mode) or DEFAULT_POLICY_MODE,
+        "formation_id": normalize_optional_string(formation_id) or DEFAULT_FORMATION_ID,
+        "policy_mode": normalize_optional_string(policy_mode) or DEFAULT_POLICY_MODE,
         "block_selection_report": block_selection_report,
         "working_context_summary": working_context_summary,
         "context_bias": {
@@ -235,13 +243,16 @@ def _build_execution_trace(
     if trace_events:
         for item in trace_events:
             if isinstance(item, Mapping):
-                events.append(dict(_to_json_value(item)))
+                events.append(dict(to_json_value(item)))
 
     if not events:
         events.append(
             _trace_event(
                 event_type="runtime_completed",
-                status=_normalize_optional_string(_mapping_get(run_result, "execution_result.status")) or "unknown",
+                status=normalize_optional_string(
+                    _mapping_get(run_result, "execution_result.status")
+                )
+                or "unknown",
                 created_at=created_at,
                 metadata={
                     "tool_name": _mapping_get(run_result, "execution_result.tool_name"),
@@ -266,10 +277,13 @@ def _build_execution_trace(
     events.append(
         _trace_event(
             event_type="evaluation_completed",
-            status=_normalize_optional_string(realm_evaluation.get("status")) or "unknown",
+            status=normalize_optional_string(realm_evaluation.get("status"))
+            or "unknown",
             created_at=created_at,
             metadata={
-                "automatic_action": _mapping_get(realm_evaluation, "metadata.automatic_action"),
+                "automatic_action": _mapping_get(
+                    realm_evaluation, "metadata.automatic_action"
+                ),
             },
         )
     )
@@ -281,17 +295,24 @@ def _build_failure_signature(run_result: Mapping[str, Any]) -> dict[str, Any]:
     verification_report = _coerce_mapping(run_result.get("verification_report"))
     residual_followup = _coerce_mapping(run_result.get("residual_followup"))
     governance = _coerce_mapping(residual_followup.get("governance"))
-    execution_status = _normalize_optional_string(execution_result.get("status")) or "unknown"
+    execution_status = (
+        normalize_optional_string(execution_result.get("status")) or "unknown"
+    )
 
     if execution_status != "success":
         error_payload = _coerce_mapping(execution_result.get("error"))
-        failure_class = _normalize_optional_string(error_payload.get("type")) or execution_status
+        failure_class = (
+            normalize_optional_string(error_payload.get("type")) or execution_status
+        )
         return {
             "status": "failed",
             "failure_class": failure_class,
-            "error_type": _normalize_optional_string(error_payload.get("type")) or failure_class,
+            "error_type": normalize_optional_string(error_payload.get("type"))
+            or failure_class,
             "failed_stage": "execution",
-            "message_excerpt": _shorten_text(_normalize_optional_string(error_payload.get("message")) or ""),
+            "message_excerpt": _shorten_text(
+                normalize_optional_string(error_payload.get("message")) or ""
+            ),
         }
     if verification_report and not bool(verification_report.get("passed")):
         return {
@@ -299,7 +320,9 @@ def _build_failure_signature(run_result: Mapping[str, Any]) -> dict[str, Any]:
             "failure_class": "verification_failed",
             "error_type": "verification_failed",
             "failed_stage": "verification",
-            "message_excerpt": _shorten_text(_normalize_optional_string(verification_report.get("status")) or ""),
+            "message_excerpt": _shorten_text(
+                normalize_optional_string(verification_report.get("status")) or ""
+            ),
         }
     if bool(governance.get("requires_governance_override")):
         return {
@@ -307,7 +330,9 @@ def _build_failure_signature(run_result: Mapping[str, Any]) -> dict[str, Any]:
             "failure_class": "governance_review_required",
             "error_type": "governance_review_required",
             "failed_stage": "governance",
-            "message_excerpt": _shorten_text(_normalize_optional_string(governance.get("status")) or ""),
+            "message_excerpt": _shorten_text(
+                normalize_optional_string(governance.get("status")) or ""
+            ),
         }
     return {
         "status": "success",
@@ -323,20 +348,24 @@ def _build_task_summary(
     run_result: Mapping[str, Any],
 ) -> dict[str, Any]:
     if isinstance(surface_request, Mapping):
-        task_text = _normalize_optional_string(surface_request.get("task")) or ""
+        task_text = normalize_optional_string(surface_request.get("task")) or ""
     else:
         task_text = ""
     task_contract = _coerce_mapping(run_result.get("task_contract"))
     return {
-        "task": task_text or _normalize_optional_string(task_contract.get("goal")) or "",
-        "task_type": _normalize_optional_string(task_contract.get("task_type")) or "",
-        "task_id": _normalize_optional_string(task_contract.get("task_id")) or "",
-        "contract_id": _normalize_optional_string(task_contract.get("contract_id")) or "",
+        "task": task_text or normalize_optional_string(task_contract.get("goal")) or "",
+        "task_type": normalize_optional_string(task_contract.get("task_type")) or "",
+        "task_id": normalize_optional_string(task_contract.get("task_id")) or "",
+        "contract_id": normalize_optional_string(task_contract.get("contract_id"))
+        or "",
     }
 
 
 def _build_run_status(run_result: Mapping[str, Any]) -> str:
-    execution_status = _normalize_optional_string(_mapping_get(run_result, "execution_result.status")) or "unknown"
+    execution_status = (
+        normalize_optional_string(_mapping_get(run_result, "execution_result.status"))
+        or "unknown"
+    )
     verification_passed = bool(_mapping_get(run_result, "verification_report.passed"))
     if execution_status == "success" and verification_passed:
         return "success"
@@ -347,10 +376,13 @@ def _extract_workflow_profile_id(run_result: Mapping[str, Any]) -> str:
     candidates = (
         _mapping_get(run_result, "surface.workflow_profile_id"),
         _mapping_get(run_result, "task_contract.workflow_profile_id"),
-        _mapping_get(run_result, "evaluation_input_bundle.task_contract_summary.workflow_profile_id"),
+        _mapping_get(
+            run_result,
+            "evaluation_input_bundle.task_contract_summary.workflow_profile_id",
+        ),
     )
     for value in candidates:
-        text = _normalize_optional_string(value)
+        text = normalize_optional_string(value)
         if text:
             return text
     return "default_general"
@@ -358,7 +390,7 @@ def _extract_workflow_profile_id(run_result: Mapping[str, Any]) -> str:
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> dict[str, str]:
     path.write_text(
-        json.dumps(_to_json_value(payload), ensure_ascii=True, indent=2, sort_keys=True),
+        json.dumps(to_json_value(payload), ensure_ascii=True, indent=2, sort_keys=True),
         encoding="utf-8",
     )
     return {"format": "json", "path": str(path)}
@@ -366,10 +398,12 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> dict[str, str]:
 
 def _write_jsonl(path: Path, rows: Sequence[Mapping[str, Any]]) -> dict[str, str]:
     serialized_rows = [
-        json.dumps(_to_json_value(row), ensure_ascii=True, sort_keys=True)
+        json.dumps(to_json_value(row), ensure_ascii=True, sort_keys=True)
         for row in rows
     ]
-    path.write_text("\n".join(serialized_rows) + ("\n" if serialized_rows else ""), encoding="utf-8")
+    path.write_text(
+        "\n".join(serialized_rows) + ("\n" if serialized_rows else ""), encoding="utf-8"
+    )
     return {"format": "jsonl", "path": str(path)}
 
 
@@ -384,12 +418,12 @@ def _trace_event(
         "timestamp": _format_created_at(created_at),
         "event_type": event_type,
         "status": status,
-        "metadata": dict(_to_json_value(metadata or {})),
+        "metadata": dict(to_json_value(metadata or {})),
     }
 
 
 def _coerce_mapping(value: object) -> dict[str, Any]:
-    normalized = _to_json_value(value)
+    normalized = to_json_value(value)
     if isinstance(normalized, Mapping):
         return dict(normalized)
     return {}
@@ -423,25 +457,7 @@ def _format_created_at(value: datetime) -> str:
 
 
 def _normalize_required_string(value: object | None, *, field_name: str) -> str:
-    text = _normalize_optional_string(value)
+    text = normalize_optional_string(value)
     if not text:
         raise ValueError(f"{field_name} must not be empty")
     return text
-
-
-def _normalize_optional_string(value: object | None) -> str | None:
-    text = str(value).strip() if value is not None else ""
-    return text or None
-
-
-def _to_json_value(value: Any) -> Any:
-    if isinstance(value, Enum):
-        return value.value
-    if is_dataclass(value):
-        return {key: _to_json_value(item) for key, item in asdict(value).items()}
-    if isinstance(value, Mapping):
-        return {str(key): _to_json_value(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_to_json_value(item) for item in value]
-    return value
-

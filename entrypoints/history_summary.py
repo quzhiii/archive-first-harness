@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from entrypoints._utils import normalize_optional_string
 from entrypoints.run_history import list_run_history
 
 
@@ -29,14 +30,14 @@ def build_run_history_summary_entry(entry: Mapping[str, Any]) -> RunHistorySumma
     if not isinstance(entry, Mapping):
         raise TypeError("entry must be a mapping")
     return RunHistorySummaryEntry(
-        run_id=_normalize_optional_string(entry.get("run_id")) or "",
-        created_at=_normalize_optional_string(entry.get("created_at")) or "",
-        batch_name=_normalize_optional_string(entry.get("batch_name")) or "batch",
+        run_id=normalize_optional_string(entry.get("run_id")) or "",
+        created_at=normalize_optional_string(entry.get("created_at")) or "",
+        batch_name=normalize_optional_string(entry.get("batch_name")) or "batch",
         total_tasks=int(entry.get("total_tasks", 0) or 0),
         completed_tasks=int(entry.get("completed_tasks", 0) or 0),
         failed_tasks=int(entry.get("failed_tasks", 0) or 0),
         stopped_early=bool(entry.get("stopped_early", False)),
-        output_dir=_normalize_optional_string(entry.get("output_dir")) or "",
+        output_dir=normalize_optional_string(entry.get("output_dir")) or "",
         formats=_coerce_formats(entry.get("exported_formats")),
     )
 
@@ -54,7 +55,9 @@ def build_run_history_summary(
             selected_entries = []
         else:
             selected_entries = selected_entries[-limit:]
-    return [build_run_history_summary_entry(entry).as_dict() for entry in selected_entries]
+    return [
+        build_run_history_summary_entry(entry).as_dict() for entry in selected_entries
+    ]
 
 
 def write_latest_run_pointer(
@@ -94,7 +97,9 @@ def write_run_history_summary(
     limit: int = 20,
 ) -> dict[str, Any]:
     history_path = Path(history_file)
-    summary_entries = build_run_history_summary(list_run_history(history_path), limit=limit)
+    summary_entries = build_run_history_summary(
+        list_run_history(history_path), limit=limit
+    )
     summary_path = _resolve_history_summary_file(summary_file, history_path)
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary_path.write_text(
@@ -123,7 +128,7 @@ def _resolve_latest_run_file(
     history_path: Path,
 ) -> Path:
     if latest_run_file is not None:
-        path_text = _normalize_optional_string(latest_run_file)
+        path_text = normalize_optional_string(latest_run_file)
         if not path_text:
             raise ValueError("latest_run_file must not be empty")
         return Path(path_text)
@@ -135,7 +140,7 @@ def _resolve_history_summary_file(
     history_path: Path,
 ) -> Path:
     if summary_file is not None:
-        path_text = _normalize_optional_string(summary_file)
+        path_text = normalize_optional_string(summary_file)
         if not path_text:
             raise ValueError("summary_file must not be empty")
         return Path(path_text)
@@ -147,12 +152,7 @@ def _coerce_formats(value: object) -> list[str]:
         return []
     formats: list[str] = []
     for item in value:
-        text = _normalize_optional_string(item)
+        text = normalize_optional_string(item)
         if text:
             formats.append(text)
     return formats
-
-
-def _normalize_optional_string(value: object | None) -> str | None:
-    text = str(value).strip() if value is not None else ""
-    return text or None

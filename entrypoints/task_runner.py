@@ -1,12 +1,18 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, field, is_dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from entrypoints._utils import (
+    json_dumps,
+    normalize_optional_string,
+    normalize_required_string,
+    normalize_string_list,
+    to_json_value,
+)
 from entrypoints.run_archive import write_run_archive
 from entrypoints.run_history import build_run_id
 from entrypoints.settings import Settings
@@ -41,13 +47,13 @@ class SurfaceTaskRequest:
 
     def __post_init__(self) -> None:
         self.task = str(self.task).strip()
-        self.task_type = _normalize_optional_string(self.task_type)
-        self.workflow_profile_id = _normalize_optional_string(self.workflow_profile_id)
-        self.workflow_profile = _normalize_optional_string(self.workflow_profile)
-        self.mission_profile_id = _normalize_optional_string(self.mission_profile_id)
+        self.task_type = normalize_optional_string(self.task_type)
+        self.workflow_profile_id = normalize_optional_string(self.workflow_profile_id)
+        self.workflow_profile = normalize_optional_string(self.workflow_profile)
+        self.mission_profile_id = normalize_optional_string(self.mission_profile_id)
         self.constraints = dict(self.constraints or {})
-        self.success_criteria = _normalize_string_list(self.success_criteria)
-        self.expected_artifacts = _normalize_string_list(self.expected_artifacts)
+        self.success_criteria = normalize_string_list(self.success_criteria)
+        self.expected_artifacts = normalize_string_list(self.expected_artifacts)
 
         if not self.task:
             raise ValueError("task must not be empty")
@@ -59,7 +65,6 @@ class SurfaceTaskRequest:
             "mission_profile_id": self.mission_profile_id,
             "task_type": self.task_type,
         }
-
 
 
 def run_task_request(
@@ -113,7 +118,7 @@ def run_task_request(
             },
         }
     )
-    _write_json(contracts_dir / "latest_contract.json", _to_json_value(task_contract))
+    _write_json(contracts_dir / "latest_contract.json", to_json_value(task_contract))
 
     state_manager = StateManager(state_dir)
     state_manager.save_task_block(
@@ -164,7 +169,11 @@ def run_task_request(
                 "status": str(execution_result.get("status") or "unknown"),
                 "metadata": {
                     "tool_name": str(execution_result.get("tool_name") or ""),
-                    "sandboxed": bool(execution_result.get("metadata", {}).get("sandboxed")) if isinstance(execution_result.get("metadata"), Mapping) else False,
+                    "sandboxed": bool(
+                        execution_result.get("metadata", {}).get("sandboxed")
+                    )
+                    if isinstance(execution_result.get("metadata"), Mapping)
+                    else False,
                 },
             }
         )
@@ -174,22 +183,36 @@ def run_task_request(
             {
                 "timestamp": _timestamp_now(),
                 "event_type": "verification_completed",
-                "status": "passed" if bool(verification_report.get("passed")) else "failed",
+                "status": "passed"
+                if bool(verification_report.get("passed"))
+                else "failed",
                 "metadata": {
-                    "verification_status": str(verification_report.get("status") or "unknown"),
+                    "verification_status": str(
+                        verification_report.get("status") or "unknown"
+                    ),
                 },
             }
         )
     residual_followup = output.get("residual_followup")
     if isinstance(residual_followup, Mapping):
-        governance = residual_followup.get("governance") if isinstance(residual_followup.get("governance"), Mapping) else None
+        governance = (
+            residual_followup.get("governance")
+            if isinstance(residual_followup.get("governance"), Mapping)
+            else None
+        )
         trace_events.append(
             {
                 "timestamp": _timestamp_now(),
                 "event_type": "governance_completed",
-                "status": str(governance.get("status") or "clear") if isinstance(governance, Mapping) else "clear",
+                "status": str(governance.get("status") or "clear")
+                if isinstance(governance, Mapping)
+                else "clear",
                 "metadata": {
-                    "governance_required": bool(governance.get("requires_governance_override")) if isinstance(governance, Mapping) else False,
+                    "governance_required": bool(
+                        governance.get("requires_governance_override")
+                    )
+                    if isinstance(governance, Mapping)
+                    else False,
                 },
             }
         )
@@ -201,7 +224,9 @@ def run_task_request(
                 "event_type": "evaluation_completed",
                 "status": str(realm_evaluation.get("status") or "unknown"),
                 "metadata": {
-                    "requires_human_review": bool(realm_evaluation.get("requires_human_review")),
+                    "requires_human_review": bool(
+                        realm_evaluation.get("requires_human_review")
+                    ),
                 },
             }
         )
@@ -230,7 +255,6 @@ def run_task_request(
     return output
 
 
-
 def surface_result_succeeded(result: Mapping[str, Any]) -> bool:
     execution_result = result.get("execution_result")
     verification_report = result.get("verification_report")
@@ -241,7 +265,6 @@ def surface_result_succeeded(result: Mapping[str, Any]) -> bool:
     execution_ok = str(execution_result.get("status") or "") == "success"
     verification_ok = bool(verification_report.get("passed"))
     return execution_ok and verification_ok
-
 
 
 def _coerce_surface_task_request(
@@ -261,16 +284,17 @@ def _coerce_surface_task_request(
         raise TypeError("request.constraints must be a mapping when provided")
 
     return SurfaceTaskRequest(
-        task=_normalize_required_string(request.get("task")),
-        task_type=_normalize_optional_string(request.get("task_type")),
-        workflow_profile_id=_normalize_optional_string(request.get("workflow_profile_id")),
-        workflow_profile=_normalize_optional_string(request.get("workflow_profile")),
-        mission_profile_id=_normalize_optional_string(request.get("mission_profile_id")),
+        task=normalize_required_string(request.get("task")),
+        task_type=normalize_optional_string(request.get("task_type")),
+        workflow_profile_id=normalize_optional_string(
+            request.get("workflow_profile_id")
+        ),
+        workflow_profile=normalize_optional_string(request.get("workflow_profile")),
+        mission_profile_id=normalize_optional_string(request.get("mission_profile_id")),
         constraints=normalized_constraints,
-        success_criteria=_normalize_string_list(request.get("success_criteria")),
-        expected_artifacts=_normalize_string_list(request.get("expected_artifacts")),
+        success_criteria=normalize_string_list(request.get("success_criteria")),
+        expected_artifacts=normalize_string_list(request.get("expected_artifacts")),
     )
-
 
 
 def _build_builder_constraints(
@@ -283,7 +307,9 @@ def _build_builder_constraints(
     for field_name in ("workflow_profile_id", "workflow_profile", "mission_profile_id"):
         constraints.pop(field_name, None)
 
-    effective_task_type = request.task_type or _normalize_optional_string(constraints.get("task_type"))
+    effective_task_type = request.task_type or normalize_optional_string(
+        constraints.get("task_type")
+    )
     if effective_task_type:
         constraints["task_type"] = effective_task_type
 
@@ -298,39 +324,8 @@ def _build_builder_constraints(
     return constraints
 
 
-
 def _timestamp_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-def _normalize_required_string(value: object | None) -> str:
-    text = _normalize_optional_string(value)
-    return text or ""
-
-
-
-def _normalize_optional_string(value: object | None) -> str | None:
-    text = str(value).strip() if value is not None else ""
-    return text or None
-
-
-
-def _normalize_string_list(value: object) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        candidates = [value]
-    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        candidates = list(value)
-    else:
-        raise TypeError("expected a string or sequence of strings")
-
-    normalized: list[str] = []
-    for candidate in candidates:
-        text = str(candidate).strip()
-        if text:
-            normalized.append(text)
-    return normalized
-
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -338,28 +333,3 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
         json_dumps(payload),
         encoding="utf-8",
     )
-
-
-
-def json_dumps(payload: dict[str, Any]) -> str:
-    import json
-
-    return json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True)
-
-
-
-def _to_json_value(value: Any) -> Any:
-    if isinstance(value, Enum):
-        return value.value
-    if is_dataclass(value):
-        return {key: _to_json_value(item) for key, item in asdict(value).items()}
-    if isinstance(value, dict):
-        return {str(key): _to_json_value(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_to_json_value(item) for item in value]
-    return value
-
-
-
-
-

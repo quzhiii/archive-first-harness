@@ -141,7 +141,76 @@ def resolve_workflow_profile(
         return BUILTIN_WORKFLOW_PROFILES[normalized]
 
     fallback_id = default_workflow_profile_id_for_task_type(task_type)
-    return BUILTIN_WORKFLOW_PROFILES.get(fallback_id, BUILTIN_WORKFLOW_PROFILES[DEFAULT_WORKFLOW_PROFILE_ID])
+    return BUILTIN_WORKFLOW_PROFILES.get(
+        fallback_id, BUILTIN_WORKFLOW_PROFILES[DEFAULT_WORKFLOW_PROFILE_ID]
+    )
 
 
+def load_profiles_from_file(
+    path: str,
+) -> dict[str, WorkflowProfile]:
+    """Load user-defined WorkflowProfiles from a JSON file.
 
+    Expected file format::
+
+        {
+          "my_custom_profile": {
+            "name": "My Custom Profile",
+            "intent_class": "build",
+            "success_focus": ["artifact correctness"],
+            "artifact_expectation": ["patch"],
+            "context_bias": ["task_block"],
+            "evaluation_bias": ["verification clarity"],
+            "notes": "Optional notes."
+          }
+        }
+
+    Returns an empty dict if the file does not exist (silent skip).
+    Raises ValueError if the file exists but is malformed.
+    """
+    import json
+    from pathlib import Path as _Path
+
+    p = _Path(path)
+    if not p.exists():
+        return {}
+    try:
+        raw = json.loads(p.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise ValueError(f"Failed to parse profile file {path}: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(
+            f"Profile file must be a JSON object, got {type(raw).__name__}"
+        )
+    result: dict[str, WorkflowProfile] = {}
+    for pid, pdata in raw.items():
+        if not isinstance(pdata, dict):
+            raise ValueError(f"Profile '{pid}' must be a JSON object")
+        try:
+            result[pid] = WorkflowProfile(
+                profile_id=pid,
+                name=str(pdata.get("name", pid)),
+                intent_class=str(pdata.get("intent_class", "general")),
+                success_focus=tuple(pdata.get("success_focus", [])),
+                artifact_expectation=tuple(pdata.get("artifact_expectation", [])),
+                context_bias=tuple(pdata.get("context_bias", [])),
+                evaluation_bias=tuple(pdata.get("evaluation_bias", [])),
+                notes=str(pdata.get("notes", "")),
+            )
+        except Exception as exc:
+            raise ValueError(f"Invalid profile definition for '{pid}': {exc}") from exc
+    return result
+
+
+def resolve_workflow_profile_with_extras(
+    profile_id: str | None,
+    *,
+    task_type: "TaskType | str | None" = None,
+    extra_profiles: dict[str, WorkflowProfile] | None = None,
+) -> WorkflowProfile:
+    """Like resolve_workflow_profile but also searches extra_profiles dict first."""
+    if extra_profiles:
+        normalized = normalize_workflow_profile_id(profile_id)
+        if normalized and normalized in extra_profiles:
+            return extra_profiles[normalized]
+    return resolve_workflow_profile(profile_id, task_type=task_type)

@@ -16,6 +16,7 @@ __pycache__/
 /pip-install-*/
 /pip-unpack-*/
 /pytest-cache-files-*/
+.tmp-py/
 
 # Aider / Codex tool caches
 .aider.chat.history.md
@@ -34,3 +35,9 @@ paper/writing/*.blg
 paper/writing/*.log
 paper/writing/*.out
 paper/writing/*.pdf
+paper/writing-v2/*.aux
+paper/writing-v2/*.bbl
+paper/writing-v2/*.blg
+paper/writing-v2/*.log
+paper/writing-v2/*.out
+paper/writing-v2/*.pdf

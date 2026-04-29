@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.13.2-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Stage](https://img.shields.io/badge/stage-public%20alpha-1f6feb)](#current-status)
-[![Tests](https://img.shields.io/badge/tests-291%20passed-brightgreen)](#validation)
+[![Tests](https://img.shields.io/badge/tests-308%20passed-brightgreen)](#validation)
 
 [**中文文档**](README.zh-CN.md) | [English](README.md)
 
@@ -115,6 +115,24 @@ Duration:       2.3s         →   30.0s (timeout)
 
 ---
 
+## EMNLP 2026 Demo Submission
+
+This repository accompanies an EMNLP 2026 System Demonstrations submission.
+The core demo is fully local and reproducible with the Python standard library:
+
+```bash
+python quickstart.py
+python -m entrypoints.cli demo
+python -m entrypoints.cli archive --archive-root artifacts/runs \
+  --compare-run-id demo_success_ping \
+  --compare-run-id demo_failure_guardrail
+```
+
+The demo creates deterministic success/failure archives and shows how the
+Evidence Layer turns raw runs into structured, comparable debugging evidence.
+
+---
+
 ## Architecture
 
 ### Layer Structure
@@ -190,7 +208,7 @@ python -m entrypoints.cli archive \
 - Browse: latest, by ID, filtered lists
 - Side-by-side comparison with diff highlighting
 - Aggregate trend summaries
-- 291 tests passing
+- 308 tests passing
 - Verified on Windows / Linux / macOS
 
 ### Not Available ❌
